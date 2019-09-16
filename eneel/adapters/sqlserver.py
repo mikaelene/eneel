@@ -102,15 +102,17 @@ class database:
         return columns
 
     def check_table_exist(self, table_name):
-        check_statement = '''
-            
-            SELECT EXISTS (
-            SELECT 1
-            FROM   information_schema.tables 
-            WHERE  table_schema + '.' + table_name = ?
-       )'''
-        exists = self.query(check_statement, table_name)
-        return exists[0]
+        check_statement = """
+        SELECT 1
+        FROM   information_schema.tables 
+        WHERE  table_schema || '.' || table_name = '"""
+        check_statement += table_name + "'"
+        exists = self.query(check_statement)
+        if exists:
+            return True
+        else:
+            return False
+        #return exists[0][0]
 
     def create_schema(self, schema):
         if schema in self.schemas():

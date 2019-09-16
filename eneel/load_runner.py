@@ -53,11 +53,14 @@ def run_load(source, target, project, schema, table):
     replication_method = table.get('replication_method')
     #print(replication_method)
     if replication_method == "FULL_TABLE":
+        print("FULL_TABLE")
         # Export table
         file, delimiter = source.export_table(source_schema, source_table, temp_path, csv_delimiter)
 
         if target.check_table_exist(full_target_table):
+            print('truncate')
             target.truncate_table(full_target_table)
+
         else:
             # Recreate table
             columns = source.table_columns(source_schema, source_table)
@@ -66,7 +69,7 @@ def run_load(source, target, project, schema, table):
         # Import table
         target.import_table(target_schema, target_table, file, delimiter)
 
-        #utils.copy_table(source, target, temp_path, source_schema, source_table, target_schema, target_table)
+        utils.copy_table(source, target, temp_path, source_schema, source_table, target_schema, target_table)
 
         # delete csv-file
         utils.delete_file(file)

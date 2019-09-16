@@ -4,7 +4,7 @@ import eneel.utils as utils
 
 
 class database:
-    def __init__(self, server, user, password, database):
+    def __init__(self, server, user, password, database, limit_rows=None):
         try:
             server_db = server + "/" + database
             conn_string = user + ", " + password + ", " + server + "/" + database
@@ -14,6 +14,7 @@ class database:
             self._database = database
             self._server_db = server_db
             self._dialect = "oracle"
+            self._limit_rows = limit_rows
 
             print(conn_string)
             self._conn = cx_Oracle.connect(user, password, server_db)
@@ -151,8 +152,8 @@ class database:
         last_column_name = columns[-1:][0][1]
         select_stmt += last_column_name
         select_stmt += ' FROM ' + schema + "." + table
-        if limit:
-            select_stmt += " FETCH FIRST " + str(limit) + " ROW ONLY"
+        if self._limit_rows:
+            select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
 
         select_stmt += ";\n"
 
@@ -190,7 +191,7 @@ spool """
         cmd += "set NLS_NUMERIC_CHARACTERS=. \n"
         cmd += "sqlplus " + self._user + "/" + self._password + "@//" + self._server_db + " @" + sql_file
 
-        print(cmd)
+        # print(cmd)
         cmd_file = os.path.join(path, self._database + "_" + schema + "_" + table + ".cmd")
 
         with open(cmd_file, "w") as text_file:

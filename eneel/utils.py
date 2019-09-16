@@ -138,7 +138,7 @@ def connection_from_config(connection_info):
     if connection_info['type'] == 'oracle':
         print('oracle')
         server = connection_info['credentials']['host'] + ':' + str(connection_info['credentials']['port'])
-        return oracle.database(server, user, password, database)
+        return oracle.database(server, user, password, database, limit_rows)
     elif connection_info['type'] == 'sqlserver':
         print('sqlserver')
         odbc_driver = connection_info['credentials']['driver']
