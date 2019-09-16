@@ -3,7 +3,7 @@ import subprocess
 import shutil
 import yaml
 import eneel.adapters.postgres as postgres
-#import adapters.oracle as oracle
+import eneel.adapters.oracle as oracle
 import eneel.adapters.sqlserver as sqlserver
 
 

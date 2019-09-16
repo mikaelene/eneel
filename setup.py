@@ -19,6 +19,7 @@ setup(
     install_requires=[
         'pyodbc>=4.0.27',
         'psycopg2>=2.7.7',
+        'cx-Oracle>=7.0.0',
         'PyYAML>=3.11',
     ],
     entry_points={
