@@ -2,10 +2,11 @@ import os
 import subprocess
 import psycopg2
 import psycopg2.extras
-#import eneel.utils as utils
+import eneel.logger as logger
+logger = logger.get_logger(__name__)
 
 
-class database:
+class Database:
     def __init__(self, server, user, password, database, limit_rows=None):
         try:
             conn_string = "host=" + server + " dbname=" + \
@@ -21,10 +22,9 @@ class database:
             self._conn.autocommit = True
             #self._cursor = self._conn.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor)
             self._cursor = self._conn.cursor()
-            print("Connection to postgres successful")
+            logger.debug("Connection sucess")
         except:
-            #logger.error("Connection error")
-            print("Error while connecting to postgres")
+            logger.error("Connection error")
 
     def __enter__(self):
         return self
@@ -64,12 +64,11 @@ class database:
         return self.cursor.fetchmany(rows)
 
     def query(self, sql, params=None):
-        print('querying')
         try:
             self.cursor.execute(sql, params or ())
             return self.fetchall()
         except psycopg2.DatabaseError as e:
-            print(e)
+            logger.error(e)
             #print("Postgres-Error-Code:", e.pgcode)
             #print("Postgres-Error-Message:", e.pgerror)
 
@@ -153,16 +152,16 @@ class database:
     def truncate_table(self, table_name):
         sql = "TRUNCATE TABLE " + table_name
         self.execute(sql)
-        print(table_name + " truncated")
+        logger.debug(table_name + " truncated")
 
     def create_schema(self, schema):
         if schema in self.schemas():
-            print("Schema exist")
+            logger.debug("Schema exists")
         else:
             create_statement = 'CREATE SCHEMA ' + schema
             self.execute(create_statement)
             #self.commit()
-            print("Schema created")
+            logger.debug("Schema created")
 
     def get_max_column_value(self, table_name, column):
         sql = "SELECT MAX(" + column + ")::text FROM " + table_name
@@ -187,7 +186,7 @@ class database:
             select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
         if self._limit_rows:
             select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
-        print(select_stmt)
+        logger.debug(select_stmt)
 
         # Generate file name
         file_name = self._database + "_" + schema + "_" + table + ".csv"
@@ -200,12 +199,9 @@ class database:
         sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
         file = open(file_path, "w")
         self.cursor.copy_expert(sql=sql % (select_stmt, delimiter), file=file)
-        print(str(self.cursor.rowcount) + " records exported")
+        logger.info(str(self.cursor.rowcount) + " records exported")
 
         #cmd = "COPY (" + select_stmt + ") TO '" + file_path + "' With CSV DELIMITER '" + delimiter + "';"
-
-        #cmd_out = utils.run_cmd(cmd)
-        #print(cmd_out)
 
         return file_path, delimiter
 
@@ -215,7 +211,7 @@ class database:
         sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
         file = open(file, "r")
         self.cursor.copy_expert(sql=sql % (schema_table, delimiter), file=file)
-        print(str(self.cursor.rowcount) + " records imported")
+        logger.info(str(self.cursor.rowcount) + " records imported")
 
     def generate_create_table_ddl(self, schema, table, columns):
         create_table_sql = "CREATE TABLE " + schema + "." + table + "(\n"
@@ -260,4 +256,4 @@ class database:
         self.create_schema(schema)
         create_table_sql = self.generate_create_table_ddl(schema, table, columns)
         self.execute(create_table_sql)
-        print("table created")
+        logger.debug("table created")

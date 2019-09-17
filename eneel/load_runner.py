@@ -1,6 +1,8 @@
 import eneel.utils as utils
 from concurrent.futures import ProcessPoolExecutor as Executor
 import os
+import eneel.logger as logger
+logger = logger.get_logger(__name__)
 
 
 def run_project(connections_path, project_path):
@@ -43,17 +45,15 @@ def run_project(connections_path, project_path):
 
             #run_load(source, target, project, schema, table)
 
-    #print(loads[''])
-
     workers = project.get('parallel_loads',1)
-    print("Start loading tables with " + str(workers) + " parallel workers")
+    logger.info("Start loading tables with " + str(workers) + " parallel workers")
 
     with Executor(max_workers=workers) as executor:
         for _ in executor.map(run_load, source_conninfos, target_conninfos, projects, schemas, tables):
             pass
 
     utils.delete_path(temp_path)
-    print("Finished loading tables")
+    logger.info("Finished loading tables")
 
 
 def run_load(source_conninfo, target_conninfo, project, schema, table):
@@ -84,14 +84,13 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
 
     # Load type
     replication_method = table.get('replication_method')
-    #print(replication_method)
+
     if replication_method == "FULL_TABLE":
-        print("Start loading: " + full_source_table + " using FULL_TABLE replication")
+        logger.info("Start loading: " + full_source_table + " using FULL_TABLE replication")
         # Export table
         file, delimiter = source.export_table(source_schema, source_table, temp_path_load, csv_delimiter)
 
         if target.check_table_exist(full_target_table):
-            #print('truncate')
             target.truncate_table(full_target_table)
 
         else:
@@ -103,7 +102,7 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
         target.import_table(target_schema, target_table, file, delimiter)
 
     elif replication_method == "INCREMENTAL":
-        print("Start loading: " + full_source_table + " using INCREMENTAL replication")
+        logger.info("Start loading: " + full_source_table + " using INCREMENTAL replication")
         replication_key = table.get('replication_key')
 
         if target.check_table_exist(full_target_table):
@@ -123,8 +122,8 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
         target.import_table(target_schema, target_table, file, delimiter)
 
     else:
-        print("replication_method not valid")
+        logger.info("replication_method not valid")
 
     # delete temp folder
     utils.delete_path(temp_path_load)
-    print("Finished loading: " + full_source_table)
+    logger.info("Finished loading: " + full_source_table)

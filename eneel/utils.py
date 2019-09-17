@@ -5,6 +5,8 @@ import yaml
 import eneel.adapters.postgres as postgres
 import eneel.adapters.oracle as oracle
 import eneel.adapters.sqlserver as sqlserver
+import eneel.logger as logger
+logger = logger.get_logger(__name__)
 
 
 def create_relative_path(path_name):
@@ -142,15 +144,15 @@ def connection_from_config(connection_info):
     if connection_info.get('type') == 'oracle':
         #print('oracle')
         server = connection_info['credentials'].get('host') + ':' + str(connection_info['credentials'].get('port'))
-        return oracle.database(server, user, password, database, limit_rows)
+        return oracle.Database(server, user, password, database, limit_rows)
     elif connection_info.get('type') == 'sqlserver':
         #print('sqlserver')
         odbc_driver = connection_info['credentials'].get('driver')
         trusted_connection = connection_info['credentials'].get('trusted_connection')
-        return sqlserver.database(odbc_driver, server, database, limit_rows, user, password, trusted_connection)
+        return sqlserver.Database(odbc_driver, server, database, limit_rows, user, password, trusted_connection)
     elif connection_info.get('type') == 'postgres':
         #print('postgres')
-        return postgres.database(server, user, password, database, limit_rows)
+        return postgres.Database(server, user, password, database, limit_rows)
     else:
         print('source type not found')
 
