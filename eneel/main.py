@@ -15,7 +15,10 @@ def main():
     else:
         print("Connections config: ", args.connections)
         print("Project config: ", args.project)
-        load_runner.run_project(args.connections, args.project)
+        try:
+            load_runner.run_project(args.connections, args.project)
+        except KeyboardInterrupt:
+            print("Interupted by user")
 
 
 if __name__ == '__main__':

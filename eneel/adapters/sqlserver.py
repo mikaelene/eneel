@@ -8,19 +8,25 @@ def column_from_matrix(matrix, i):
 
 
 class database:
-    def __init__(self, driver, server, user, password, database):
+    def __init__(self, driver, server, database, limit_rows=None, user=None, password=None, trusted_connection=None):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
-                          database + ";UID=" + user + ";PWD=" + password
+                          database
+            if trusted_connection:
+                conn_string += ";trusted_connection=yes"
+            else:
+                 conn_string += ";UID=" + user + ";PWD=" + password
             self._server = server
             self._user = user
             self._password = password
             self._database = database
             self._dialect = "sqlserver"
+            self._limit_rows = limit_rows
+            self._trusted_connection = trusted_connection
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
-            print("Connection to sqlserver successful")
+            #print("Connection to sqlserver successful")
         except:
             # logger.error("Connection error")
             print("Error while connecting to sqlserver")
@@ -63,7 +69,6 @@ class database:
         return self.cursor.fetchmany(rows)
 
     def query(self, sql, params=None):
-        print('querying')
         try:
             self.cursor.execute(sql, params or ())
             return self.fetchall()
@@ -105,8 +110,9 @@ class database:
         check_statement = """
         SELECT 1
         FROM   information_schema.tables 
-        WHERE  table_schema || '.' || table_name = '"""
+        WHERE  table_schema + '.' + table_name = '"""
         check_statement += table_name + "'"
+        #print(check_statement)
         exists = self.query(check_statement)
         if exists:
             return True
@@ -114,21 +120,34 @@ class database:
             return False
         #return exists[0][0]
 
+    def truncate_table(self, table_name):
+        sql = "TRUNCATE TABLE " + table_name
+        self.execute(sql)
+        print(table_name + " truncated")
+
     def create_schema(self, schema):
         if schema in self.schemas():
-            print("Schema exist")
+            pass
         else:
             create_statement = 'CREATE SCHEMA ' + schema
             self.execute(create_statement)
             print("Schema created")
 
-    def export_table(self, schema, table, path, delimiter='|', limit=None):
+    def get_max_column_value(self, table_name, column):
+        sql = "SELECT cast(MAX(" + column + ") as varchar(max)) FROM " + table_name
+        max_value = self.query(sql)
+        return max_value[0][0]
 
+    def export_table(self, schema, table, path, delimiter='|', replication_key=None, max_replication_key=None):
         # Generate SQL statement for extract
         select_stmt = '"SELECT'
-        if limit:
-            select_stmt += ' TOP ' + str(limit)
-        select_stmt += ' * FROM [' + self._database + '].[' + schema + '].[' + table + ']"'
+        if self._limit_rows:
+            select_stmt += ' TOP ' + str(self._limit_rows)
+        select_stmt += ' * FROM [' + self._database + '].[' + schema + '].[' + table + ']'
+        if replication_key:
+            select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
+        select_stmt += '"'
+        print(select_stmt)
 
         #print(select_stmt)
 
@@ -138,11 +157,20 @@ class database:
 
         # Generate bcp command
         bcp_out = "bcp " + select_stmt + " queryout " + \
-                  file_path + " -t" + delimiter + " -c -U" \
-                  + self._user + " -P" + self._password + " -S" + self._server
+                  file_path + " -t" + delimiter + " -c -S" + self._server
+        if self._trusted_connection:
+            bcp_out += " -T"
+        else:
+            bcp_out += " -U" + self._user + " -P" + self._password
+
         print(bcp_out)
-        cmd_out = utils.run_cmd(bcp_out)
-        print(cmd_out)
+
+        #print(bcp_out)
+        cmd_code, cmd_message = utils.run_cmd(bcp_out)
+        if cmd_code == 0:
+            print(schema + '.' + table + " exported")
+        else:
+            print("Error exportng " + schema + '.' + table + " :" + cmd_message)
 
         return file_path, delimiter
 
@@ -150,12 +178,18 @@ class database:
 
         # Import data
         bcp_in = "bcp [" + self._database + "].[" + schema + "].[" + table + "] in " + \
-                 file + " -t" + delimiter + " -c -C" + codepage + " -U" \
-                 + self._user + " -P" + self._password + " -S" + self._server
-        print(bcp_in)
-        cmd_out = utils.run_cmd(bcp_in)
-        print(cmd_out)
+                 file + " -t" + delimiter + " -c -C" + codepage + " -U -S" + self._server
+        if self._trusted_connection:
+            bcp_in += " -T"
+        else:
+            bcp_in += " -U" + self._user + " -P" + self._password
 
+        #print(bcp_in)
+        cmd_code, cmd_message = utils.run_cmd(bcp_in)
+        if cmd_code == 0:
+            print(schema + '.' + table + " imported")
+        else:
+            print("Error importing " + schema + "." + table + " :" + cmd_message)
 
     def generate_create_table_ddl(self, schema, table, columns):
         create_table_sql = "CREATE TABLE " + schema + "." + table + "(\n"
@@ -183,7 +217,7 @@ class database:
                 else:
                     db_data_type = "FLOAT"
             elif "time zone" in data_type:
-                db_data_type = "VARCHAR(128)"
+                db_data_type = "DATETIME2"
             elif "timestamp" in data_type:
                 db_data_type = "DATETIME2"
             else:
@@ -211,7 +245,7 @@ class database:
         self.create_schema(schema)
         create_table_sql = self.generate_create_table_ddl(schema, table, columns)
         self.execute(create_table_sql)
-        print("table created")
+        print(schema + '.' + table + " created")
 
 
 

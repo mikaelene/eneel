@@ -16,12 +16,12 @@ class database:
             self._dialect = "oracle"
             self._limit_rows = limit_rows
 
-            print(conn_string)
+            #print(conn_string)
             self._conn = cx_Oracle.connect(user, password, server_db)
 
             self._cursor = self._conn.cursor()
 #            self._cursor.rowfactory = makeNamedTupleFactory(self._cursor)
-            print("Connection to oracle successful")
+            #print("Connection to oracle successful")
         except:
             #logger.error("Connection error")
             print("Error while connecting to oracle")
@@ -64,7 +64,6 @@ class database:
         return self.cursor.fetchmany(rows)
 
     def query(self, sql, params=None):
-        print('querying')
         try:
             self.cursor.execute(sql, params or ())
             return self.fetchall()
@@ -141,7 +140,7 @@ class database:
         else:
             return False
 
-    def export_table(self, schema, table, path, delimiter='|', limit=None):
+    def export_table(self, schema, table, path, delimiter='|', replication_key=None, max_replication_key=None):
         columns = self.table_columns(schema, table)
 
         # Generate SQL statement for extract
@@ -152,6 +151,8 @@ class database:
         last_column_name = columns[-1:][0][1]
         select_stmt += last_column_name
         select_stmt += ' FROM ' + schema + "." + table
+        if replication_key:
+            select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
         if self._limit_rows:
             select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
 
@@ -189,6 +190,7 @@ spool """
 
         cmd = "SET NLS_LANG=SWEDISH_SWEDEN.WE8ISO8859P1\n"
         cmd += "set NLS_NUMERIC_CHARACTERS=. \n"
+        cmd += "set NLS_TIMESTAMP_TZ_FORMAT=YYYY-MM-DD HH24:MI:SS.FF\n"
         cmd += "sqlplus " + self._user + "/" + self._password + "@//" + self._server_db + " @" + sql_file
 
         # print(cmd)
@@ -197,8 +199,11 @@ spool """
         with open(cmd_file, "w") as text_file:
             text_file.write(cmd)
 
-        cmd_out = utils.run_cmd(cmd_file)
-        print(cmd_out)
+        cmd_code, cmd_message = utils.run_cmd(cmd_file)
+        if cmd_code == 0:
+            print(schema + '.' + table + " exported")
+        else:
+            print("Error exportng " + schema + '.' + table + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
 
         return file_path, delimiter
 
@@ -234,7 +239,7 @@ spool """
         return create_table_sql
 
     def create_table_from_columns(self, schema, table, columns):
-        table_exists = check_table_exist(table)
+        table_exists = self.check_table_exist(table)
 
         if table_exists:
             self.execute("DROP TABLE " + schema + "." + table)
@@ -243,5 +248,5 @@ spool """
 
         create_table_sql = self.generate_create_table_ddl(schema, table, columns)
         self.execute(create_table_sql)
-        print("table created")
+        #print("table created")
 
