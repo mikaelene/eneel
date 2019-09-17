@@ -24,7 +24,11 @@ def create_path(path_name):
 
 def delete_path(path_name):
     if os.path.exists(path_name):
-        shutil.rmtree(path_name)
+        try:
+            shutil.rmtree(path_name)
+        except:
+            print("Could not delete directory")
+            pass
 
 
 def delete_file(file):
@@ -40,7 +44,7 @@ def copy_table(source, target, temp_file_dir, source_schema, source_table, targe
 
     # Recreate table
     columns = source.table_columns(source_schema, source_table)
-    print(columns)
+    #print(columns)
     target.create_table_from_columns(target_schema, target_table, columns)
 
     # Import table
@@ -49,7 +53,7 @@ def copy_table(source, target, temp_file_dir, source_schema, source_table, targe
     # delete csv-file
     delete_file(file)
 
-    print("table copied")
+    #print("table copied")
 
 
 def copy_tables(source, target, temp_file_dir, target_schema, tables, target_prefix=None, target_suffix=None, limit=None):
@@ -123,28 +127,29 @@ def run_cmd(cmd):
                          stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, universal_newlines=True)
     if res.returncode == 0:
-        return res.stdout
+        return res.returncode, res.stdout
     else:
-        return res.stderr
+        return res.returncode, res.stderr
 
 
 def connection_from_config(connection_info):
     #print(connection_info)
-    database = connection_info['credentials']['database']
-    user = connection_info['credentials']['user']
-    password = connection_info['credentials']['password']
-    server = connection_info['credentials']['host']
+    database = connection_info['credentials'].get('database')
+    user = connection_info['credentials'].get('user')
+    password = connection_info['credentials'].get('password')
+    server = connection_info['credentials'].get('host')
     limit_rows = connection_info.get('credentials').get('limit_rows')
-    if connection_info['type'] == 'oracle':
-        print('oracle')
-        server = connection_info['credentials']['host'] + ':' + str(connection_info['credentials']['port'])
+    if connection_info.get('type') == 'oracle':
+        #print('oracle')
+        server = connection_info['credentials'].get('host') + ':' + str(connection_info['credentials'].get('port'))
         return oracle.database(server, user, password, database, limit_rows)
-    elif connection_info['type'] == 'sqlserver':
-        print('sqlserver')
-        odbc_driver = connection_info['credentials']['driver']
-        return sqlserver.database(odbc_driver, server, user, password, database)
-    elif connection_info['type'] == 'postgres':
-        print('postgres')
+    elif connection_info.get('type') == 'sqlserver':
+        #print('sqlserver')
+        odbc_driver = connection_info['credentials'].get('driver')
+        trusted_connection = connection_info['credentials'].get('trusted_connection')
+        return sqlserver.database(odbc_driver, server, database, limit_rows, user, password, trusted_connection)
+    elif connection_info.get('type') == 'postgres':
+        #print('postgres')
         return postgres.database(server, user, password, database, limit_rows)
     else:
         print('source type not found')

@@ -1,5 +1,6 @@
 import eneel.utils as utils
-from concurrent.futures import ProcessPoolExecutor as Executor, as_completed
+from concurrent.futures import ProcessPoolExecutor as Executor
+import os
 
 
 def run_project(connections_path, project_path):
@@ -25,7 +26,6 @@ def run_project(connections_path, project_path):
         schema = schema_config.copy()
         del schema['tables']
         for table in schema_config['tables']:
-            print("Starting loading a table")
             source_conninfo_item = source_conninfo
             target_conninfo_item = target_conninfo
             project_item = project
@@ -45,9 +45,15 @@ def run_project(connections_path, project_path):
 
     #print(loads[''])
 
-    with Executor(max_workers=2) as executor:
+    workers = project.get('parallel_loads',1)
+    print("Start loading tables with " + str(workers) + " parallel workers")
+
+    with Executor(max_workers=workers) as executor:
         for _ in executor.map(run_load, source_conninfos, target_conninfos, projects, schemas, tables):
             pass
+
+    utils.delete_path(temp_path)
+    print("Finished loading tables")
 
 
 def run_load(source_conninfo, target_conninfo, project, schema, table):
@@ -56,27 +62,36 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
 
     # Temp_path
     temp_path = project.get('temp_path')
+
+    # Delimiter
     csv_delimiter = project.get('csv_delimiter')
 
     # Schemas
     source_schema = schema.get('source_schema')
     target_schema = schema.get('target_schema')
 
-    # Table
+    # Tables
     source_table = table.get('table_name')
+    full_source_table = source_schema + '.' + source_table
     target_table = schema.get('table_prefix', "") + table.get('table_name') + schema.get('table_suffix', "")
     full_target_table = target_schema + '.' + target_table
+
+    # Temp path for specific load
+    temp_path_schema = os.path.join(temp_path, source_schema)
+    #utils.create_path(temp_path_schema)
+    temp_path_load = os.path.join(temp_path_schema, source_table)
+    utils.create_path(temp_path_load)
 
     # Load type
     replication_method = table.get('replication_method')
     #print(replication_method)
     if replication_method == "FULL_TABLE":
-        print("FULL_TABLE")
+        print("Start loading: " + full_source_table + " using FULL_TABLE replication")
         # Export table
-        file, delimiter = source.export_table(source_schema, source_table, temp_path, csv_delimiter)
+        file, delimiter = source.export_table(source_schema, source_table, temp_path_load, csv_delimiter)
 
         if target.check_table_exist(full_target_table):
-            print('truncate')
+            #print('truncate')
             target.truncate_table(full_target_table)
 
         else:
@@ -87,22 +102,19 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
         # Import table
         target.import_table(target_schema, target_table, file, delimiter)
 
-        utils.copy_table(source, target, temp_path, source_schema, source_table, target_schema, target_table)
-
-        # delete csv-file
-        utils.delete_file(file)
-
     elif replication_method == "INCREMENTAL":
+        print("Start loading: " + full_source_table + " using INCREMENTAL replication")
         replication_key = table.get('replication_key')
 
         if target.check_table_exist(full_target_table):
             max_replication_key = target.get_max_column_value(full_target_table, replication_key)
             # Export new rows
-            file, delimiter = source.export_table(source_schema, source_table, temp_path, csv_delimiter, replication_key, max_replication_key)
+            file, delimiter = source.export_table(source_schema, source_table, temp_path_load, csv_delimiter,
+                                                  replication_key, max_replication_key)
 
         else:
             # Full export
-            file, delimiter = source.export_table(source_schema, source_table, temp_path, csv_delimiter)
+            file, delimiter = source.export_table(source_schema, source_table, temp_path_load, csv_delimiter)
             # Recreate table
             columns = source.table_columns(source_schema, source_table)
             target.create_table_from_columns(target_schema, target_table, columns)
@@ -110,10 +122,9 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
         # Import table
         target.import_table(target_schema, target_table, file, delimiter)
 
-        # delete csv-file
-        utils.delete_file(file)
-
     else:
         print("replication_method not valid")
 
-
+    # delete temp folder
+    utils.delete_path(temp_path_load)
+    print("Finished loading: " + full_source_table)
