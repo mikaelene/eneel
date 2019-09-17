@@ -1,13 +1,11 @@
 import os
 import pyodbc
 import eneel.utils as utils
+import eneel.logger as logger
+logger = logger.get_logger(__name__)
 
 
-def column_from_matrix(matrix, i):
-    return [row[i] for row in matrix]
-
-
-class database:
+class Database:
     def __init__(self, driver, server, database, limit_rows=None, user=None, password=None, trusted_connection=None):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
@@ -26,10 +24,9 @@ class database:
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
-            #print("Connection to sqlserver successful")
+            logger.debug("Connection to sqlserver successful")
         except:
-            # logger.error("Connection error")
-            print("Error while connecting to sqlserver")
+            logger.erro("Error while connecting to sqlserver")
 
     def __enter__(self):
         return self
@@ -73,8 +70,7 @@ class database:
             self.cursor.execute(sql, params or ())
             return self.fetchall()
         except:
-            # logger.error("query error")
-            print("query error")
+            logger.debug("query error")
 
     def schemas(self):
         q = 'SELECT schema_name FROM information_schema.schemata'
@@ -112,7 +108,6 @@ class database:
         FROM   information_schema.tables 
         WHERE  table_schema + '.' + table_name = '"""
         check_statement += table_name + "'"
-        #print(check_statement)
         exists = self.query(check_statement)
         if exists:
             return True
@@ -123,7 +118,7 @@ class database:
     def truncate_table(self, table_name):
         sql = "TRUNCATE TABLE " + table_name
         self.execute(sql)
-        print(table_name + " truncated")
+        logger.debug(table_name + " truncated")
 
     def create_schema(self, schema):
         if schema in self.schemas():
@@ -131,7 +126,7 @@ class database:
         else:
             create_statement = 'CREATE SCHEMA ' + schema
             self.execute(create_statement)
-            print("Schema created")
+            logger.debug("Schema created")
 
     def get_max_column_value(self, table_name, column):
         sql = "SELECT cast(MAX(" + column + ") as varchar(max)) FROM " + table_name
@@ -147,9 +142,7 @@ class database:
         if replication_key:
             select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
         select_stmt += '"'
-        #print(select_stmt)
-
-        #print(select_stmt)
+        logger.debug(select_stmt)
 
         # Generate file name
         file_name = self._database + '_' + schema + '_' + table + '.csv'
@@ -163,14 +156,13 @@ class database:
         else:
             bcp_out += " -U" + self._user + " -P" + self._password
 
-        #print(bcp_out)
+        logger.debug(bcp_out)
 
-        #print(bcp_out)
         cmd_code, cmd_message = utils.run_cmd(bcp_out)
         if cmd_code == 0:
-            print(schema + '.' + table + " exported")
+            logger.info(schema + '.' + table + " exported")
         else:
-            print("Error exportng " + schema + '.' + table + " :" + cmd_message)
+            logger.error("Error exportng " + schema + '.' + table + " :" + cmd_message)
 
         return file_path, delimiter
 
@@ -184,12 +176,12 @@ class database:
         else:
             bcp_in += " -U" + self._user + " -P" + self._password
 
-        #print(bcp_in)
+        logger.debug(bcp_in)
         cmd_code, cmd_message = utils.run_cmd(bcp_in)
         if cmd_code == 0:
-            print(schema + '.' + table + " imported")
+            logger.info(schema + '.' + table + " imported")
         else:
-            print("Error importing " + schema + "." + table + " :" + cmd_message)
+            logger.error("Error importing " + schema + "." + table + " :" + cmd_message)
 
     def generate_create_table_ddl(self, schema, table, columns):
         create_table_sql = "CREATE TABLE " + schema + "." + table + "(\n"
@@ -229,7 +221,7 @@ class database:
         create_table_sql = create_table_sql[:-3]
         create_table_sql += ")"
 
-        #print(create_table_sql)
+        logger.debug(create_table_sql)
 
         return create_table_sql
 
@@ -245,7 +237,7 @@ class database:
         self.create_schema(schema)
         create_table_sql = self.generate_create_table_ddl(schema, table, columns)
         self.execute(create_table_sql)
-        print(schema + '.' + table + " created")
+        logger.debug(schema + '.' + table + " created")
 
 
 

@@ -1,9 +1,11 @@
 import os
 import cx_Oracle
 import eneel.utils as utils
+import eneel.logger as logger
+logger = logger.get_logger(__name__)
 
 
-class database:
+class Database:
     def __init__(self, server, user, password, database, limit_rows=None):
         try:
             server_db = server + "/" + database
@@ -21,10 +23,9 @@ class database:
 
             self._cursor = self._conn.cursor()
 #            self._cursor.rowfactory = makeNamedTupleFactory(self._cursor)
-            #print("Connection to oracle successful")
+            logger.debug("Connection to oracle successful")
         except:
-            #logger.error("Connection error")
-            print("Error while connecting to oracle")
+            logger.error("Error while connecting to oracle")
 
     def __enter__(self):
         return self
@@ -69,8 +70,8 @@ class database:
             return self.fetchall()
         except cx_Oracle.DatabaseError as exc:
             error, = exc.args
-            print("Oracle-Error-Code:", error.code)
-            print("Oracle-Error-Message:", error.message)
+            logger.error("Oracle-Error-Code:", error.code)
+            logger.error("Oracle-Error-Message:", error.message)
 
     def schemas(self):
         q = 'SELECT DISTINCT OWNER FROM ALL_TABLES'
@@ -181,7 +182,7 @@ spool """
         spool_cmd += select_stmt
         spool_cmd += "spool off\n"
         spool_cmd += "exit"
-#        print(spool_cmd)
+        logger.debug(spool_cmd)
 
         sql_file = os.path.join(path, self._database + "_" + schema + "_" + table + ".sql")
 
@@ -193,7 +194,7 @@ spool """
         cmd += "set NLS_TIMESTAMP_TZ_FORMAT=YYYY-MM-DD HH24:MI:SS.FF\n"
         cmd += "sqlplus " + self._user + "/" + self._password + "@//" + self._server_db + " @" + sql_file
 
-        # print(cmd)
+        logger.debug(cmd)
         cmd_file = os.path.join(path, self._database + "_" + schema + "_" + table + ".cmd")
 
         with open(cmd_file, "w") as text_file:
@@ -201,9 +202,9 @@ spool """
 
         cmd_code, cmd_message = utils.run_cmd(cmd_file)
         if cmd_code == 0:
-            print(schema + '.' + table + " exported")
+            logger.info(schema + '.' + table + " exported")
         else:
-            print("Error exportng " + schema + '.' + table + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
+            logger.error("Error exportng " + schema + '.' + table + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
 
         return file_path, delimiter
 
@@ -213,7 +214,7 @@ spool """
         sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
         file = open(file, "r")
         self.cursor.copy_expert(sql=sql % (schema_table, delimiter), file=file)
-        print(str(self.cursor.rowcount) + " records imported")
+        logger.info(str(self.cursor.rowcount) + " records imported")
 
     def generate_create_table_ddl(self, schema, table, columns):
         create_table_sql = "CREATE TABLE " + schema + "." + table + "(\n"
@@ -248,5 +249,4 @@ spool """
 
         create_table_sql = self.generate_create_table_ddl(schema, table, columns)
         self.execute(create_table_sql)
-        #print("table created")
 
