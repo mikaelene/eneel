@@ -147,7 +147,7 @@ class database:
         if replication_key:
             select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
         select_stmt += '"'
-        print(select_stmt)
+        #print(select_stmt)
 
         #print(select_stmt)
 
@@ -163,7 +163,7 @@ class database:
         else:
             bcp_out += " -U" + self._user + " -P" + self._password
 
-        print(bcp_out)
+        #print(bcp_out)
 
         #print(bcp_out)
         cmd_code, cmd_message = utils.run_cmd(bcp_out)
