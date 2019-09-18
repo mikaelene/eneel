@@ -78,7 +78,6 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
 
     # Temp path for specific load
     temp_path_schema = os.path.join(temp_path, source_schema)
-    #utils.create_path(temp_path_schema)
     temp_path_load = os.path.join(temp_path_schema, source_table)
     utils.create_path(temp_path_load)
 

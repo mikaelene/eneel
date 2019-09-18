@@ -150,7 +150,7 @@ def connection_from_config(connection_info):
         #print('sqlserver')
         odbc_driver = connection_info['credentials'].get('driver')
         trusted_connection = connection_info['credentials'].get('trusted_connection')
-        return sqlserver.Database(odbc_driver, server, database, limit_rows, user, password, trusted_connection)
+        return sqlserver.Database(odbc_driver, server, database, limit_rows, user, password, trusted_connection, as_columnstore)
     elif connection_info.get('type') == 'postgres':
         #print('postgres')
         return postgres.Database(server, user, password, database, limit_rows)
