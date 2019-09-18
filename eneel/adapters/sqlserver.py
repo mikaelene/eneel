@@ -172,13 +172,24 @@ class Database:
         except:
             logger.error("Failed getting max column value")
 
-    def export_table(self, schema, table, path, delimiter='|', replication_key=None, max_replication_key=None, codepage='1252'):
+    def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None, codepage='1252'):
         try:
             # Generate SQL statement for extract
             select_stmt = '"SELECT'
+
+            # Add limit
             if self._limit_rows:
                 select_stmt += ' TOP ' + str(self._limit_rows)
-            select_stmt += ' * FROM [' + self._database + '].[' + schema + '].[' + table + ']'
+
+            # Add columns
+            for col in columns:
+                column_name = col[1]
+                select_stmt += column_name + ", "
+            select_stmt = select_stmt[:-2]
+
+            select_stmt += ' FROM [' + self._database + '].[' + schema + '].[' + table + ']'
+
+            # Add incremental where
             if replication_key:
                 select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
             select_stmt += '"'
