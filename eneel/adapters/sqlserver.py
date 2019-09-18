@@ -6,7 +6,7 @@ logger = logger.get_logger(__name__)
 
 
 class Database:
-    def __init__(self, driver, server, database, limit_rows=None, user=None, password=None, trusted_connection=None):
+    def __init__(self, driver, server, database, limit_rows=None, user=None, password=None, trusted_connection=None, as_columnstore=False):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
                           database
@@ -20,13 +20,14 @@ class Database:
             self._database = database
             self._dialect = "sqlserver"
             self._limit_rows = limit_rows
+            self._as_columnstore = as_columnstore
             self._trusted_connection = trusted_connection
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
             logger.debug("Connection to sqlserver successful")
         except:
-            logger.erro("Error while connecting to sqlserver")
+            logger.error("Error while connecting to sqlserver")
 
     def __enter__(self):
         return self
@@ -133,7 +134,7 @@ class Database:
         max_value = self.query(sql)
         return max_value[0][0]
 
-    def export_table(self, schema, table, path, delimiter='|', replication_key=None, max_replication_key=None):
+    def export_table(self, schema, table, path, delimiter='|', replication_key=None, max_replication_key=None, codepage='1252'):
         # Generate SQL statement for extract
         select_stmt = '"SELECT'
         if self._limit_rows:
@@ -150,7 +151,7 @@ class Database:
 
         # Generate bcp command
         bcp_out = "bcp " + select_stmt + " queryout " + \
-                  file_path + " -t" + delimiter + " -c -S" + self._server
+                  file_path + " -t" + delimiter + " -c -C" + codepage + " -S" + self._server
         if self._trusted_connection:
             bcp_out += " -T"
         else:
@@ -160,6 +161,7 @@ class Database:
 
         cmd_code, cmd_message = utils.run_cmd(bcp_out)
         if cmd_code == 0:
+            logger.debug(cmd_message)
             logger.info(schema + '.' + table + " exported")
         else:
             logger.error("Error exportng " + schema + '.' + table + " :" + cmd_message)
@@ -170,7 +172,7 @@ class Database:
 
         # Import data
         bcp_in = "bcp [" + self._database + "].[" + schema + "].[" + table + "] in " + \
-                 file + " -t" + delimiter + " -c -C" + codepage + " -U -S" + self._server
+                 file + " -t" + delimiter + " -c -C" + codepage + " -U -b100000 -S" + self._server
         if self._trusted_connection:
             bcp_in += " -T"
         else:
@@ -179,6 +181,7 @@ class Database:
         logger.debug(bcp_in)
         cmd_code, cmd_message = utils.run_cmd(bcp_in)
         if cmd_code == 0:
+            logger.debug(cmd_message)
             logger.info(schema + '.' + table + " imported")
         else:
             logger.error("Error importing " + schema + "." + table + " :" + cmd_message)
@@ -226,18 +229,29 @@ class Database:
         return create_table_sql
 
     def create_table_from_columns(self, schema, table, columns):
+        schema_table = schema + "." + table
         self.execute("SELECT * FROM INFORMATION_SCHEMA.TABLES "
                                     "WHERE TABLE_SCHEMA = ? AND "
                                     "TABLE_NAME = ?", [schema, table])
         table_exists = self.fetchone()
 
         if table_exists:
-            self.execute("DROP TABLE " + schema + "." + table)
+            self.execute("DROP TABLE " + schema_table)
+            logger.debug("Table: " + schema_table + " droped")
 
         self.create_schema(schema)
         create_table_sql = self.generate_create_table_ddl(schema, table, columns)
         self.execute(create_table_sql)
-        logger.debug(schema + '.' + table + " created")
+        logger.debug("Table: " + schema_table + " created")
+
+        # Create Clustered Columnstore Index if set on connection
+        if self._as_columnstore:
+            index_name = schema + "_" + table + "_cci"
+            self.execute("DROP INDEX IF EXISTS " + index_name)
+            self.execute("CREATE CLUSTERED COLUMNSTORE INDEX " + index_name + " ON" + schema_table)
+            logger.debug("Index: " + index_name + " created")
+
+
 
 
 

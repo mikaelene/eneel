@@ -141,6 +141,7 @@ def connection_from_config(connection_info):
     password = connection_info['credentials'].get('password')
     server = connection_info['credentials'].get('host')
     limit_rows = connection_info.get('credentials').get('limit_rows')
+    as_columnstore = connection_info.get('credentials').get('as_columnstore')
     if connection_info.get('type') == 'oracle':
         #print('oracle')
         server = connection_info['credentials'].get('host') + ':' + str(connection_info['credentials'].get('port'))
