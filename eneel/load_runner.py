@@ -92,11 +92,11 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
     # Columns to load
     try:
         columns = source.table_columns(source_schema, source_table)
-        columns_to_load = []
-        for col in columns:
-            data_type = col[2].lower()
-            if data_type in source_columntypes_to_exclude:
-                columns.remove(col)
+        if source_columntypes_to_exclude:
+            for col in columns:
+                data_type = col[2].lower()
+                if data_type in source_columntypes_to_exclude:
+                    columns.remove(col)
     except:
         logger.error("Could not determine columns to load")
 

@@ -220,6 +220,35 @@ class Database:
         except:
             logger.error("Failed exporting table")
 
+    def insert_from_table_and_drop(self, schema, to_table, from_table):
+        to_schema_table = schema + "." + to_table
+        from_schema_table = schema + "." + from_table
+        try:
+            self.execute("INSERT INTO " + to_schema_table + " SELECT * FROM  " + from_schema_table)
+            self.execute("DROP TABLE " + from_schema_table)
+        except:
+            logger.error("Failed to insert_from_table_and_drop")
+
+    def switch_tables(self, schema, old_table, new_table):
+        try:
+
+            old_schema_table = schema + "." + old_table
+            new_schema_table = schema + "." + new_table
+            delete_table = old_table + "_delete"
+            delete_schema_table = schema + "." + delete_table
+
+            if self.check_table_exist(old_schema_table):
+                self.execute("EXEC sp_rename '" + old_schema_table + "', '" + delete_table + "'")
+                self.execute("EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'")
+                self.execute("DROP TABLE " + delete_schema_table)
+                logger.debug("Switched tables")
+            else:
+                self.execute("EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'")
+                logger.debug("Renamed temp table")
+        except:
+            logger.error("Failed to switch tables")
+
+
     def import_table(self, schema, table, file, delimiter=',', codepage='1252'):
         try:
             # Import data
@@ -270,6 +299,8 @@ class Database:
                     db_data_type = "DATETIME2"
                 elif "timestamp" in data_type:
                     db_data_type = "DATETIME2"
+                elif "bool" in data_type:
+                    db_data_type = "INT"
                 else:
                     db_data_type = data_type
 
