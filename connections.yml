@@ -25,10 +25,10 @@ sqlserver1:
       driver: ODBC Driver 17 for SQL Server   # Your ODBC driver
       host: localhost
       port: 1433
-      user: user_name
-      password: secret_password
+      trusted_connection: True                # Use logged in user for credentials
+      as_columnstore: True                    # Create tables as Clustered Columnstore Index
       database: my_db
-      limit_rows: 100                         # Will limit all exports to 100 rows
+      limit_rows: 100
     prod:
       driver: ODBC Driver 17 for SQL Server
       host: prodserver_host

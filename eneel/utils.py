@@ -100,25 +100,30 @@ def load_file_contents(path, strip=True):
     return to_return
 
 
-def get_connections(connections_path):
+def get_connections(connections_path=None):
+    if not connections_path:
+        connections_path = os.path.join(os.path.expanduser('~'), '.eneel/connections.yml')
     #connections_path = os.path.join(os.getcwd(), 'connections.yml')
-    connections_file_contents = load_file_contents(connections_path, strip=False)
-    connections = load_yaml(connections_file_contents)
+    try:
+        connections_file_contents = load_file_contents(connections_path, strip=False)
+        connections = load_yaml(connections_file_contents)
 
-    connections_dict = {}
-    for conn in connections:
-        name = conn
-        type = connections[name]['type']
-        target = connections[name]['target']
-        credentials = connections[name]['outputs'][target]
-        connection = {'name': conn, 'type': type, 'target': target, 'credentials': credentials}
+        connections_dict = {}
+        for conn in connections:
+            name = conn
+            type = connections[name]['type']
+            target = connections[name]['target']
+            credentials = connections[name]['outputs'][target]
+            connection = {'name': conn, 'type': type, 'target': target, 'credentials': credentials}
 
-        connections_dict[name] = connection
-    return connections_dict
+            connections_dict[name] = connection
+        return connections_dict
+    except:
+        logger.error("Could not load connections.yml")
 
 
-def get_project(project_path):
-    project_file_contents = load_file_contents(project_path, strip=False)
+def get_project(project):
+    project_file_contents = load_file_contents(project + '.yml', strip=False)
     project = load_yaml(project_file_contents)
 
     return project

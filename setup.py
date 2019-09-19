@@ -2,6 +2,9 @@
 from setuptools import find_packages
 from distutils.core import setup
 
+import os
+eneel_path = os.path.join(os.path.expanduser('~'), '.eneel')
+
 package_name = "eneel"
 package_version = "0.1.0"
 description = """A package for fast loading av relation data"""
@@ -25,4 +28,7 @@ setup(
     entry_points={
             'console_scripts': ['eneel=eneel.main:main'],
         },
+    data_files = [
+        (eneel_path, ['connections.yml']),
+    ],
 )

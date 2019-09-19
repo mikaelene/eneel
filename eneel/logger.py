@@ -1,4 +1,10 @@
 import logging
+import os
+
+
+def create_relative_path(path_name):
+    if not os.path.exists(path_name):
+        os.makedirs(path_name)
 
 
 def get_logger(name=__name__):
@@ -18,6 +24,11 @@ def get_logger(name=__name__):
 
     # File handler
     file_log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+    log_path = "/logs"
+    log_file_name = "eneel.log"
+
+    #full_log_path = os.path.join(log_path, log_file_name)
 
     file_handler = logging.FileHandler("eneel.log")
     file_handler.setLevel(logging.DEBUG)

@@ -5,7 +5,7 @@ import eneel.logger as logger
 logger = logger.get_logger(__name__)
 
 
-def run_project(connections_path, project_path):
+def run_project(project_path, connections_path=None):
     connections_config = utils.get_connections(connections_path)
     project_config = utils.get_project(project_path)
 
