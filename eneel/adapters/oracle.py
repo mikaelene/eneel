@@ -141,8 +141,8 @@ class Database:
         else:
             return False
 
-    def export_table(self, schema, table, path, delimiter='|', replication_key=None, max_replication_key=None):
-        columns = self.table_columns(schema, table)
+    def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None):
+        #columns = self.table_columns(schema, table)
 
         # Generate SQL statement for extract
         select_stmt = "SELECT "

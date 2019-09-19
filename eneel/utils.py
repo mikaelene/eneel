@@ -141,7 +141,6 @@ def connection_from_config(connection_info):
     password = connection_info['credentials'].get('password')
     server = connection_info['credentials'].get('host')
     limit_rows = connection_info.get('credentials').get('limit_rows')
-    as_columnstore = connection_info.get('credentials').get('as_columnstore')
     if connection_info.get('type') == 'oracle':
         #print('oracle')
         server = connection_info['credentials'].get('host') + ':' + str(connection_info['credentials'].get('port'))
@@ -150,6 +149,7 @@ def connection_from_config(connection_info):
         #print('sqlserver')
         odbc_driver = connection_info['credentials'].get('driver')
         trusted_connection = connection_info['credentials'].get('trusted_connection')
+        as_columnstore = connection_info.get('credentials').get('as_columnstore')
         return sqlserver.Database(odbc_driver, server, database, limit_rows, user, password, trusted_connection, as_columnstore)
     elif connection_info.get('type') == 'postgres':
         #print('postgres')
