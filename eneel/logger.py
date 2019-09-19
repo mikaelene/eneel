@@ -25,12 +25,11 @@ def get_logger(name=__name__):
     # File handler
     file_log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
-    log_path = "/logs"
-    log_file_name = "eneel.log"
-
     #full_log_path = os.path.join(log_path, log_file_name)
+    log_filename = "logs/eneel.log"
+    os.makedirs(os.path.dirname(log_filename), exist_ok=True)
 
-    file_handler = logging.FileHandler("eneel.log")
+    file_handler = logging.FileHandler(log_filename)
     file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter(file_log_format)
     file_handler.setFormatter(file_formatter)
