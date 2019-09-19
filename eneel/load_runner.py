@@ -45,8 +45,11 @@ def run_project(connections_path, project_path):
 
             #run_load(source, target, project, schema, table)
 
-    workers = project.get('parallel_loads',1)
-    logger.info("Start loading tables with " + str(workers) + " parallel workers")
+    workers = project.get('parallel_loads', 1)
+    num_tables_to_load = len(tables)
+    if num_tables_to_load < workers:
+        workers = num_tables_to_load
+    logger.info("Start loading " + str(num_tables_to_load) + " tables with " + str(workers) + " parallel workers")
 
     with Executor(max_workers=workers) as executor:
         for _ in executor.map(run_load, source_conninfos, target_conninfos, projects, schemas, tables):
@@ -93,10 +96,12 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
     try:
         columns = source.table_columns(source_schema, source_table)
         if source_columntypes_to_exclude:
+            columns_to_load = columns.copy()
             for col in columns:
                 data_type = col[2].lower()
                 if data_type in source_columntypes_to_exclude:
-                    columns.remove(col)
+                    columns_to_load.remove(col)
+        columns = columns_to_load
     except:
         logger.error("Could not determine columns to load")
 
@@ -134,26 +139,29 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
         logger.info("Start loading: " + full_source_table + " using INCREMENTAL replication")
         replication_key = table.get('replication_key')
 
-        # Create temp table
-        target.create_table_from_columns(target_schema, target_table_tmp, columns)
-
         if target.check_table_exist(full_target_table) and replication_key:
             max_replication_key = target.get_max_column_value(full_target_table, replication_key)
             # Export new rows
             file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load, csv_delimiter,
                                                   replication_key, max_replication_key)
+            # Create temp table
+            target.create_table_from_columns(target_schema, target_table_tmp, columns)
             # Import into temp table
             target.import_table(target_schema, target_table_tmp, file, delimiter)
             # Insert into and drop
             target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
+            logger.info(full_source_table + " updated")
 
         else:
             # Full export
             file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load, csv_delimiter)
+            # Create temp table
+            target.create_table_from_columns(target_schema, target_table_tmp, columns)
             # Import into temp table
             target.import_table(target_schema, target_table_tmp, file, delimiter)
             # Switch tables
             target.switch_tables(target_schema, target_table, target_table_tmp)
+            logger.info(full_source_table + " imported")
 
         # Import table
 

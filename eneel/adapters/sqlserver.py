@@ -175,11 +175,11 @@ class Database:
     def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None, codepage='1252'):
         try:
             # Generate SQL statement for extract
-            select_stmt = '"SELECT'
+            select_stmt = '"SELECT '
 
             # Add limit
             if self._limit_rows:
-                select_stmt += ' TOP ' + str(self._limit_rows)
+                select_stmt += 'TOP ' + str(self._limit_rows)
 
             # Add columns
             for col in columns:
@@ -263,9 +263,8 @@ class Database:
             cmd_code, cmd_message = utils.run_cmd(bcp_in)
             if cmd_code == 0:
                 logger.debug(cmd_message)
-                logger.info(schema + '.' + table + " imported")
             else:
-                logger.error("Error importing " + schema + "." + table + " :" + cmd_message)
+                logger.debug("Error importing " + schema + "." + table + " :" + cmd_message)
         except:
             logger.error("Failed importing table")
 
@@ -337,8 +336,8 @@ class Database:
             if self._as_columnstore:
                 try:
                     index_name = schema + "_" + table + "_cci"
-                    self.execute("DROP INDEX IF EXISTS " + index_name)
-                    self.execute("CREATE CLUSTERED COLUMNSTORE INDEX " + index_name + " ON" + schema_table)
+                    self.execute("DROP INDEX IF EXISTS " + index_name + " ON " + schema_table)
+                    self.execute("CREATE CLUSTERED COLUMNSTORE INDEX " + index_name + " ON " + schema_table)
                     logger.debug("Index: " + index_name + " created")
                 except:
                     logger.error("Failed create columnstoreindex")
