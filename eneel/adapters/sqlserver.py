@@ -300,6 +300,8 @@ class Database:
                     db_data_type = "DATETIME2"
                 elif "bool" in data_type:
                     db_data_type = "INT"
+                elif "clob" in data_type:
+                    db_data_type = "VARCHAR(MAX)"
                 else:
                     db_data_type = data_type
 

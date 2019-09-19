@@ -101,7 +101,7 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
                 data_type = col[2].lower()
                 if data_type in source_columntypes_to_exclude:
                     columns_to_load.remove(col)
-        columns = columns_to_load
+            columns = columns_to_load
     except:
         logger.error("Could not determine columns to load")
 
@@ -168,7 +168,7 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
 
 
     else:
-        logger.info("replication_method not valid")
+        logger.error("replication_method not valid")
 
     # delete temp folder
     utils.delete_path(temp_path_load)
