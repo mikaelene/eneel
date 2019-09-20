@@ -20,12 +20,12 @@ def main():
         project_name =  args.project
         import eneel.logger as logger
         logger = logger.get_logger(project_name)
-#        logger.info("Connections config: " + args.connections)
+        #        logger.info("Connections config: " + args.connections)
         logger.info("Loading project: " + project_name)
         try:
             load_runner.run_project(project_name, args.connections)
         except KeyboardInterrupt:
-            logger.warning("Interupted by user")
+            print("Interupted by user")
 
 
 if __name__ == '__main__':

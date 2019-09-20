@@ -7,7 +7,7 @@ logger = logging.getLogger('main_logger')
 
 
 class Database:
-    def __init__(self, server, user, password, database, limit_rows=None):
+    def __init__(self, server, user, password, database, limit_rows=None, table_where_clause=None):
         try:
             server_db = server + "/" + database
             conn_string = user + ", " + password + ", " + server + "/" + database
@@ -18,6 +18,7 @@ class Database:
             self._server_db = server_db
             self._dialect = "oracle"
             self._limit_rows = limit_rows
+            self._table_where_clause = table_where_clause
 
             #print(conn_string)
             self._conn = cx_Oracle.connect(user, password, server_db)
@@ -166,8 +167,24 @@ class Database:
             last_column_name = columns[-1:][0][1]
             select_stmt += last_column_name
             select_stmt += ' FROM ' + schema + "." + table
+
+            # Where-claues for incremental replication
             if replication_key:
-                select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
+                replication_where = replication_key + " > " + "'" + max_replication_key + "'"
+            else:
+                replication_where = None
+
+            wheres = replication_where, self._table_where_clause
+            wheres = [x for x in wheres if x is not None]
+            if len(wheres) > 0:
+                select_stmt += " WHERE " + wheres[0]
+                for where in wheres[1:]:
+                    select_stmt += " AND " + where
+            #if replication_key or self._table_where_clause:
+            #    select_stmt += " WHERE "
+            #if replication_key and not self._table_where_clause:
+            #    select_stmt += replication_key + " > " + "'" + max_replication_key + "'"
+
             if self._limit_rows:
                 select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
 

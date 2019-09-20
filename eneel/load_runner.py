@@ -71,6 +71,10 @@ def run_load(project_name, source_conninfo, target_conninfo, project, temp_path,
     import eneel.logger as logger
     logger = logger.get_logger(project_name)
 
+    # Remove duplicated handler if any
+    for handler in logger.handlers[2:]:
+        logger.removeHandler(handler)
+
     source = utils.connection_from_config(source_conninfo)
     target = utils.connection_from_config(target_conninfo)
 

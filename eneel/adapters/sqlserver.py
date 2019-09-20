@@ -179,7 +179,7 @@ class Database:
 
             # Add limit
             if self._limit_rows:
-                select_stmt += 'TOP ' + str(self._limit_rows)
+                select_stmt += 'TOP ' + str(self._limit_rows) + ' '
 
             # Add columns
             for col in columns:
@@ -187,7 +187,7 @@ class Database:
                 select_stmt += column_name + ", "
             select_stmt = select_stmt[:-2]
 
-            select_stmt += ' FROM [' + self._database + '].[' + schema + '].[' + table + ']'
+            select_stmt += ' FROM [' + self._database + '].[' + schema + '].[' + table + ']' + ' WITH (NOLOCK)'
 
             # Add incremental where
             if replication_key:
@@ -216,9 +216,9 @@ class Database:
                     num_rows = str(return_message[-3].split()[0])
                     timing = str(return_message[-1].split()[5])
                     average = str(return_message[-1].split()[8][1:-3])
-                    logger.info(num_rows + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
+                    logger.info(table + ": " + num_rows + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
                 except:
-                    logger.warning("Failed to parse sucessfull export cmd")
+                    logger.warning(table + ": " + "Failed to parse sucessfull export cmd for")
                 logger.info(schema + '.' + table + " exported")
             else:
                 logger.error("Error exportng " + schema + '.' + table + " :" + cmd_message)
@@ -274,9 +274,9 @@ class Database:
                     num_rows = str(return_message[-3].split()[0])
                     timing = str(return_message[-1].split()[5])
                     average = str(return_message[-1].split()[8][1:-3])
-                    logger.info(num_rows + " rows imported, in " + timing + " ms. at an average of " + average + " rows per sec")
+                    logger.info(table + ": " + num_rows + " rows imported, in " + timing + " ms. at an average of " + average + " rows per sec")
                 except:
-                    logger.warning("Failed to parse sucessfull import cmd")
+                    logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
             else:
                 logger.debug("Error importing " + schema + "." + table + " :" + cmd_message)
         except:

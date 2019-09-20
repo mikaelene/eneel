@@ -146,10 +146,11 @@ def connection_from_config(connection_info):
     password = connection_info['credentials'].get('password')
     server = connection_info['credentials'].get('host')
     limit_rows = connection_info.get('credentials').get('limit_rows')
+    table_where_clause = connection_info.get('credentials').get('table_where_clause')
     if connection_info.get('type') == 'oracle':
         #print('oracle')
         server = connection_info['credentials'].get('host') + ':' + str(connection_info['credentials'].get('port'))
-        return oracle.Database(server, user, password, database, limit_rows)
+        return oracle.Database(server, user, password, database, limit_rows, table_where_clause)
     elif connection_info.get('type') == 'sqlserver':
         #print('sqlserver')
         odbc_driver = connection_info['credentials'].get('driver')
