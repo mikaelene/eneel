@@ -1,13 +1,14 @@
 import eneel.utils as utils
 from concurrent.futures import ProcessPoolExecutor as Executor
 import os
-import eneel.logger as logger
-logger = logger.get_logger(__name__)
+import logging
+logger = logging.getLogger('main_logger')
 
 
-def run_project(project_path, connections_path=None):
+def run_project(project_name, connections_path=None):
+    # Get configurations
     connections_config = utils.get_connections(connections_path)
-    project_config = utils.get_project(project_path)
+    project_config = utils.get_project(project_name)
 
     source_conninfo = connections_config[project_config['source']]
     target_conninfo = connections_config[project_config['target']]
@@ -15,15 +16,21 @@ def run_project(project_path, connections_path=None):
     project = project_config.copy()
     del project['schemas']
 
-    temp_path = project.get('temp_path')
-    utils.create_path(temp_path)
+    # Create temp dir
+    temp_path = project.get('temp_path', 'temp')
+    temp_path = temp_path + '/' + project_name
+    temp_path = utils.create_path(temp_path)
 
+    # Lists of load settings
+    project_names = []
     source_conninfos = []
     target_conninfos = []
     projects = []
     schemas = []
     tables = []
+    temp_paths = []
 
+    # Populate load settings
     for schema_config in project_config['schemas']:
         schema = schema_config.copy()
         del schema['tables']
@@ -34,37 +41,38 @@ def run_project(project_path, connections_path=None):
             schema_item = schema
             table_item = table
 
+            project_names.append(project_name)
             source_conninfos.append(source_conninfo_item)
             target_conninfos.append(target_conninfo_item)
             projects.append(project_item)
             schemas.append(schema_item)
             tables.append(table_item)
+            temp_paths.append(temp_path)
 
-            #load = [source, target, project, schema, table]
-            #loads.append(load)
-
-            #run_load(source, target, project, schema, table)
-
+    # Parallel load settings
     workers = project.get('parallel_loads', 1)
     num_tables_to_load = len(tables)
     if num_tables_to_load < workers:
         workers = num_tables_to_load
     logger.info("Start loading " + str(num_tables_to_load) + " tables with " + str(workers) + " parallel workers")
 
+    # Execute parallel load
     with Executor(max_workers=workers) as executor:
-        for _ in executor.map(run_load, source_conninfos, target_conninfos, projects, schemas, tables):
+        for _ in executor.map(run_load, project_names, source_conninfos, target_conninfos,
+                              projects, temp_paths, schemas, tables):
             pass
 
+    # Clean up temp dir
     utils.delete_path(temp_path)
-    logger.info("Finished loading tables")
+    logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
 
 
-def run_load(source_conninfo, target_conninfo, project, schema, table):
+def run_load(project_name, source_conninfo, target_conninfo, project, temp_path, schema, table):
+    import eneel.logger as logger
+    logger = logger.get_logger(project_name)
+
     source = utils.connection_from_config(source_conninfo)
     target = utils.connection_from_config(target_conninfo)
-
-    # Temp_path
-    temp_path = project.get('temp_path')
 
     # Delimiter
     csv_delimiter = project.get('csv_delimiter')
@@ -108,7 +116,7 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
     # Load type
     replication_method = table.get('replication_method')
 
-    if replication_method == "FULL_TABLE":
+    if not replication_method or replication_method == "FULL_TABLE":
         logger.info("Start loading: " + full_source_table + " using FULL_TABLE replication")
         # Export table
         file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
@@ -122,18 +130,6 @@ def run_load(source_conninfo, target_conninfo, project, schema, table):
 
         # Switch tables
         target.switch_tables(target_schema, target_table, target_table_tmp)
-
-        #if target.check_table_exist(full_target_table):
-
-            #target.truncate_table(full_target_table)
-
-        #else:
-            # Recreate table
-            #columns = source.table_columns(source_schema, source_table)
-            #target.create_table_from_columns(target_schema, target_table, columns)
-
-        # Import table
-        #target.import_table(target_schema, target_table, file, delimiter)
 
     elif replication_method == "INCREMENTAL":
         logger.info("Start loading: " + full_source_table + " using INCREMENTAL replication")

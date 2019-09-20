@@ -2,14 +2,9 @@ import logging
 import os
 
 
-def create_relative_path(path_name):
-    if not os.path.exists(path_name):
-        os.makedirs(path_name)
+def get_logger(project='eneel'):
 
-
-def get_logger(name=__name__):
-
-    logger = logging.getLogger(name)
+    logger = logging.getLogger('main_logger')
     logger.setLevel('DEBUG')
 
     # Stream handler
@@ -25,8 +20,7 @@ def get_logger(name=__name__):
     # File handler
     file_log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
-    #full_log_path = os.path.join(log_path, log_file_name)
-    log_filename = "logs/eneel.log"
+    log_filename = "logs/" + project + ".log"
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
 
     file_handler = logging.FileHandler(log_filename)

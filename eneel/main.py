@@ -1,7 +1,5 @@
 import eneel.load_runner as load_runner
 import argparse
-import eneel.logger as logger
-logger = logger.get_logger(__name__)
 
 
 def main():
@@ -12,16 +10,20 @@ def main():
     args = parser.parse_args()
 
     if not args.project:
-        logger.error("You need to supply your project name. I.e my_project to use my_project.yml")
+        #logger.error("You need to supply your project name. I.e my_project to use my_project.yml")
+        print("You need to supply your project name. I.e my_project to use my_project.yml")
 
 #    if not args.connections:
 #        logger.error("You need to supply a path to your connections.yml")
 
     else:
+        project_name =  args.project
+        import eneel.logger as logger
+        logger = logger.get_logger(project_name)
 #        logger.info("Connections config: " + args.connections)
-        logger.info("Loading project: " + args.project)
+        logger.info("Loading project: " + project_name)
         try:
-            load_runner.run_project(args.project, args.connections)
+            load_runner.run_project(project_name, args.connections)
         except KeyboardInterrupt:
             logger.warning("Interupted by user")
 

@@ -2,8 +2,8 @@ import os
 import cx_Oracle
 import sys
 import eneel.utils as utils
-import eneel.logger as logger
-logger = logger.get_logger(__name__)
+import logging
+logger = logging.getLogger('main_logger')
 
 
 class Database:

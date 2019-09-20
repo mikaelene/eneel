@@ -2,8 +2,8 @@ import os
 import sys
 import pyodbc
 import eneel.utils as utils
-import eneel.logger as logger
-logger = logger.get_logger(__name__)
+import logging
+logger = logging.getLogger('main_logger')
 
 
 class Database:
@@ -211,7 +211,14 @@ class Database:
 
             cmd_code, cmd_message = utils.run_cmd(bcp_out)
             if cmd_code == 0:
-                logger.debug(cmd_message)
+                try:
+                    return_message = cmd_message.splitlines()
+                    num_rows = str(return_message[-3].split()[0])
+                    timing = str(return_message[-1].split()[5])
+                    average = str(return_message[-1].split()[8][1:-3])
+                    logger.info(num_rows + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
+                except:
+                    logger.warning("Failed to parse sucessfull export cmd")
                 logger.info(schema + '.' + table + " exported")
             else:
                 logger.error("Error exportng " + schema + '.' + table + " :" + cmd_message)
@@ -262,7 +269,14 @@ class Database:
             logger.debug(bcp_in)
             cmd_code, cmd_message = utils.run_cmd(bcp_in)
             if cmd_code == 0:
-                logger.debug(cmd_message)
+                try:
+                    return_message = cmd_message.splitlines()
+                    num_rows = str(return_message[-3].split()[0])
+                    timing = str(return_message[-1].split()[5])
+                    average = str(return_message[-1].split()[8][1:-3])
+                    logger.info(num_rows + " rows imported, in " + timing + " ms. at an average of " + average + " rows per sec")
+                except:
+                    logger.warning("Failed to parse sucessfull import cmd")
             else:
                 logger.debug("Error importing " + schema + "." + table + " :" + cmd_message)
         except:
