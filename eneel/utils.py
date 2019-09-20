@@ -5,8 +5,8 @@ import yaml
 import eneel.adapters.postgres as postgres
 import eneel.adapters.oracle as oracle
 import eneel.adapters.sqlserver as sqlserver
-import eneel.logger as logger
-logger = logger.get_logger(__name__)
+import logging
+logger = logging.getLogger('main_logger')
 
 
 def create_relative_path(path_name):

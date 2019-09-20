@@ -2,8 +2,8 @@ import os
 import sys
 import psycopg2
 import psycopg2.extras
-import eneel.logger as logger
-logger = logger.get_logger(__name__)
+import logging
+logger = logging.getLogger('main_logger')
 
 
 class Database:
