@@ -165,10 +165,9 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
         index = load_order
         total = num_tables_to_load
         status = "START"
-        printer.print_load_line(index, total, status, full_source_table)
-        #start_table_load_msg = "Start loading: " + full_source_table + " using FULL_TABLE replication"
-        #printer.print_output_line(start_table_load_msg)
-        #logger.info("Start loading: " + full_source_table + " using FULL_TABLE replication")
+        table_msg = full_source_table + " (" + "FULL_TABLE" + ")"
+        printer.print_load_line(index, total, status, table_msg)
+
         # Export table
         file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
                                               csv_delimiter)
@@ -182,17 +181,13 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
         # Switch tables
         target.switch_tables(target_schema, target_table, target_table_tmp)
 
-        #msg = "DONE loading " + full_source_table
-
-        #printer.print_fancy_output_line(msg, import_status, 1, 2)
-
     elif replication_method == "INCREMENTAL":
         index = load_order
         total = num_tables_to_load
         status = "START"
-        printer.print_load_line(index, total, status, full_source_table)
+        table_msg = full_source_table + " (" + replication_method + ")"
+        printer.print_load_line(index, total, status, table_msg)
 
-        #logger.info("Start loading: " + full_source_table + " using INCREMENTAL replication")
         replication_key = table.get('replication_key')
 
         if target.check_table_exist(full_target_table) and replication_key:

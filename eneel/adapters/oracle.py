@@ -7,7 +7,7 @@ logger = logging.getLogger('main_logger')
 
 
 class Database:
-    def __init__(self, server, user, password, database, limit_rows=None, table_where_clause=None):
+    def __init__(self, server, user, password, database, limit_rows=None, table_where_clause=None, read_only=False):
         try:
             server_db = server + "/" + database
             conn_string = user + ", " + password + ", " + server + "/" + database
@@ -19,12 +19,10 @@ class Database:
             self._dialect = "oracle"
             self._limit_rows = limit_rows
             self._table_where_clause = table_where_clause
+            self._read_only = read_only
 
-            #print(conn_string)
             self._conn = cx_Oracle.connect(user, password, server_db)
-
             self._cursor = self._conn.cursor()
-#            self._cursor.rowfactory = makeNamedTupleFactory(self._cursor)
             logger.debug("Connection to oracle successful")
         except cx_Oracle.Error as e:
             logger.error(e)
@@ -265,6 +263,8 @@ spool """
         return create_table_sql
 
     def create_table_from_columns(self, schema, table, columns):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
         table_exists = self.check_table_exist(table)
 
         if table_exists:

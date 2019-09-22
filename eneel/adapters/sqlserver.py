@@ -8,7 +8,7 @@ logger = logging.getLogger('main_logger')
 
 class Database:
     def __init__(self, driver, server, database, limit_rows=None, user=None, password=None,
-                 trusted_connection=None, as_columnstore=False):
+                 trusted_connection=None, as_columnstore=False, read_only=False):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
                           database
@@ -24,6 +24,7 @@ class Database:
             self._limit_rows = limit_rows
             self._as_columnstore = as_columnstore
             self._trusted_connection = trusted_connection
+            self._read_only = read_only
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
@@ -145,6 +146,8 @@ class Database:
             logger.error("Failed checking table exist")
 
     def truncate_table(self, table_name):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
         try:
             sql = "TRUNCATE TABLE " + table_name
             self.execute(sql)
@@ -153,6 +156,8 @@ class Database:
             logger.error("Failed truncating table")
 
     def create_schema(self, schema):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
         try:
             if schema in self.schemas():
                 pass
@@ -228,6 +233,8 @@ class Database:
             logger.error("Failed exporting table")
 
     def insert_from_table_and_drop(self, schema, to_table, from_table):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
         to_schema_table = schema + "." + to_table
         from_schema_table = schema + "." + from_table
         try:
@@ -237,6 +244,8 @@ class Database:
             logger.error("Failed to insert_from_table_and_drop")
 
     def switch_tables(self, schema, old_table, new_table):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
         try:
 
             old_schema_table = schema + "." + old_table
@@ -255,8 +264,9 @@ class Database:
         except:
             logger.error("Failed to switch tables")
 
-
     def import_table(self, schema, table, file, delimiter=',', codepage='1252'):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
         try:
             # Import data
             bcp_in = "bcp [" + self._database + "].[" + schema + "].[" + table + "] in " + \
@@ -334,6 +344,8 @@ class Database:
             logger.error("Failed generating create table script")
 
     def create_table_from_columns(self, schema, table, columns):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
         try:
             schema_table = schema + "." + table
             self.execute("SELECT * FROM INFORMATION_SCHEMA.TABLES "
@@ -361,8 +373,4 @@ class Database:
                     logger.error("Failed create columnstoreindex")
         except:
             logger.error("Failed create table from columns")
-
-
-
-
 
