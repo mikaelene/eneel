@@ -216,10 +216,10 @@ class Database:
                     num_rows = str(return_message[-3].split()[0])
                     timing = str(return_message[-1].split()[5])
                     average = str(return_message[-1].split()[8][1:-3])
-                    logger.info(table + ": " + num_rows + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
+                    logger.debug(table + ": " + num_rows + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
                 except:
                     logger.warning(table + ": " + "Failed to parse sucessfull export cmd for")
-                logger.info(schema + '.' + table + " exported")
+                logger.debug(schema + '.' + table + " exported")
             else:
                 logger.error("Error exportng " + schema + '.' + table + " :" + cmd_message)
 
@@ -271,12 +271,14 @@ class Database:
             if cmd_code == 0:
                 try:
                     return_message = cmd_message.splitlines()
-                    num_rows = str(return_message[-3].split()[0])
-                    timing = str(return_message[-1].split()[5])
-                    average = str(return_message[-1].split()[8][1:-3])
-                    logger.info(table + ": " + num_rows + " rows imported, in " + timing + " ms. at an average of " + average + " rows per sec")
+                    row_count = str(return_message[-3].split()[0])
+                    return "DONE", row_count
+                    #timing = str(return_message[-1].split()[5])
+                    #average = str(return_message[-1].split()[8][1:-3])
+                    #logger.debug(table + ": " + row_count + " rows imported, in " + timing + " ms. at an average of " + average + " rows per sec")
                 except:
                     logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
+                    return "DONE", None
             else:
                 logger.debug("Error importing " + schema + "." + table + " :" + cmd_message)
         except:

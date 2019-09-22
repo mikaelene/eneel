@@ -233,7 +233,7 @@ spool """
 
             cmd_code, cmd_message = utils.run_cmd(cmd_file)
             if cmd_code == 0:
-                logger.info(schema + '.' + table + " exported")
+                logger.debug(schema + '.' + table + " exported")
             else:
                 logger.error("Error exportng " + schema + '.' + table + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
 

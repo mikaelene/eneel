@@ -234,8 +234,8 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
 
     #printer.print_fancy_output_line(msg, "OK", 1, 2)
 
-    index = 1
-    total = 2
+    index = load_order
+    total = num_tables_to_load
     status = import_status
     rows = import_row_count
     execution_time = time.time() - load_start_time
