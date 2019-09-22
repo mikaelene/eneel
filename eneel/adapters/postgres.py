@@ -2,6 +2,8 @@ import os
 import sys
 import psycopg2
 import psycopg2.extras
+import eneel.printer as printer
+
 import logging
 logger = logging.getLogger('main_logger')
 
@@ -207,7 +209,14 @@ class Database:
             sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
             file = open(file_path, "w")
             self.cursor.copy_expert(sql=sql % (select_stmt, delimiter), file=file)
-            logger.info(str(self.cursor.rowcount) + " records exported")
+
+            row_count = self.cursor.rowcount
+
+            msg = str(row_count) + " records exported"
+            #logger.info(msg)
+
+            #printer.print_fancy_output_line(msg, "OK", 1, 2)
+
 
             #cmd = "COPY (" + select_stmt + ") TO '" + file_path + "' With CSV DELIMITER '" + delimiter + "';"
 
@@ -254,10 +263,17 @@ class Database:
                 self.cursor.copy_expert(sql=sql % (schema_table, delimiter), file=file)
             except psycopg2.Error as e:
                 logger.error(e)
+                return "ERROR", e
 
-            logger.info(str(self.cursor.rowcount) + " records imported")
+            row_count = str(self.cursor.rowcount)
+
+            #logger.info(row_count+ " records imported")
+
+            return "DONE", row_count
+
         except:
             logger.error("Failed importing table")
+            return "ERROR", e
 
     def generate_create_table_ddl(self, schema, table, columns):
         try:

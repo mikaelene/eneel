@@ -1,6 +1,9 @@
 import eneel.utils as utils
 from concurrent.futures import ProcessPoolExecutor as Executor
 import os
+import eneel.printer as printer
+import time
+
 import logging
 logger = logging.getLogger('main_logger')
 
@@ -54,7 +57,11 @@ def run_project(project_name, connections_path=None):
     num_tables_to_load = len(tables)
     if num_tables_to_load < workers:
         workers = num_tables_to_load
-    logger.info("Start loading " + str(num_tables_to_load) + " tables with " + str(workers) + " parallel workers")
+    start_msg = "Start loading " + str(num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
+    #logger.info("Start loading " + str(num_tables_to_load) + " tables with " + str(workers) + " parallel workers")
+    printer.print_output_line(start_msg)
+
+    job_start_time = time.time()
 
     # Execute parallel load
     with Executor(max_workers=workers) as executor:
@@ -64,10 +71,20 @@ def run_project(project_name, connections_path=None):
 
     # Clean up temp dir
     utils.delete_path(temp_path)
-    logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
+
+    execution_time = time.time() - job_start_time
+
+    status_time = " in {execution_time:0.2f}s".format(
+        execution_time=execution_time)
+
+    end_msg = "Finished loading " + str(num_tables_to_load) + " tables in " + status_time
+    printer.print_output_line(end_msg)
+    #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
 
 
 def run_load(project_name, source_conninfo, target_conninfo, project, temp_path, schema, table):
+    load_start_time = time.time()
+
     import eneel.logger as logger
     logger = logger.get_logger(project_name)
 
@@ -121,7 +138,13 @@ def run_load(project_name, source_conninfo, target_conninfo, project, temp_path,
     replication_method = table.get('replication_method')
 
     if not replication_method or replication_method == "FULL_TABLE":
-        logger.info("Start loading: " + full_source_table + " using FULL_TABLE replication")
+        index = 1
+        total = 2
+        status = "START"
+        printer.print_load_line(index, total, status, full_source_table)
+        #start_table_load_msg = "Start loading: " + full_source_table + " using FULL_TABLE replication"
+        #printer.print_output_line(start_table_load_msg)
+        #logger.info("Start loading: " + full_source_table + " using FULL_TABLE replication")
         # Export table
         file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
                                               csv_delimiter)
@@ -130,13 +153,22 @@ def run_load(project_name, source_conninfo, target_conninfo, project, temp_path,
         target.create_table_from_columns(target_schema, target_table_tmp, columns)
 
         # Import into temp table
-        target.import_table(target_schema, target_table_tmp, file, delimiter)
+        import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
 
         # Switch tables
         target.switch_tables(target_schema, target_table, target_table_tmp)
 
+        #msg = "DONE loading " + full_source_table
+
+        #printer.print_fancy_output_line(msg, import_status, 1, 2)
+
     elif replication_method == "INCREMENTAL":
-        logger.info("Start loading: " + full_source_table + " using INCREMENTAL replication")
+        index = 1
+        total = 2
+        status = "START"
+        printer.print_load_line(index, total, status, full_source_table)
+
+        #logger.info("Start loading: " + full_source_table + " using INCREMENTAL replication")
         replication_key = table.get('replication_key')
 
         if target.check_table_exist(full_target_table) and replication_key:
@@ -147,10 +179,10 @@ def run_load(project_name, source_conninfo, target_conninfo, project, temp_path,
             # Create temp table
             target.create_table_from_columns(target_schema, target_table_tmp, columns)
             # Import into temp table
-            target.import_table(target_schema, target_table_tmp, file, delimiter)
+            import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
             # Insert into and drop
             target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
-            logger.info(full_source_table + " updated")
+            #logger.info(full_source_table + " updated")
 
         else:
             # Full export
@@ -158,7 +190,7 @@ def run_load(project_name, source_conninfo, target_conninfo, project, temp_path,
             # Create temp table
             target.create_table_from_columns(target_schema, target_table_tmp, columns)
             # Import into temp table
-            target.import_table(target_schema, target_table_tmp, file, delimiter)
+            import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
             # Switch tables
             target.switch_tables(target_schema, target_table, target_table_tmp)
             logger.info(full_source_table + " imported")
@@ -172,4 +204,17 @@ def run_load(project_name, source_conninfo, target_conninfo, project, temp_path,
 
     # delete temp folder
     utils.delete_path(temp_path_load)
-    logger.info("Finished loading: " + full_source_table)
+
+    end_table_load_msg = "Finished loading: " + full_source_table
+    #printer.print_output_line(end_table_load_msg)
+
+    #printer.print_fancy_output_line(msg, "OK", 1, 2)
+
+    index = 1
+    total = 2
+    status = import_status
+    rows = import_row_count
+    execution_time = time.time() - load_start_time
+    printer.print_load_line(index, total, status, full_source_table, rows, execution_time)
+
+    #logger.info("Finished loading: " + full_source_table)

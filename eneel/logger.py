@@ -1,5 +1,8 @@
 import logging
 import os
+import colorama
+
+colorama.init()
 
 
 def get_logger(project='eneel'):
@@ -8,12 +11,16 @@ def get_logger(project='eneel'):
     logger.setLevel('DEBUG')
 
     # Stream handler
-    stream_log_format = '%(asctime)s - %(levelname)s - %(message)s'
-
     stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(logging.Formatter('%(message)s'))
     stream_handler.setLevel(logging.INFO)
-    stream_formatter = logging.Formatter(stream_log_format)
-    stream_handler.setFormatter(stream_formatter)
+
+    #stream_log_format = '%(asctime)s - %(levelname)s - %(message)s'
+
+    #stream_handler = logging.StreamHandler()
+    #stream_handler.setLevel(logging.INFO)
+    #stream_formatter = logging.Formatter(stream_log_format)
+    #stream_handler.setFormatter(stream_formatter)
 
     logger.addHandler(stream_handler)
 

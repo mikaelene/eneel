@@ -189,3 +189,5 @@ def run_load(load_strategy, source, target, temp_file_dir, source_schema, source
         print("table copied")
     elif load_strategy == "INCREMENTAL":
         pass
+
+
