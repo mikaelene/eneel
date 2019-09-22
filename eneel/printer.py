@@ -10,6 +10,18 @@ COLOR_FG_GREEN = colorama.Fore.GREEN
 COLOR_FG_YELLOW = colorama.Fore.YELLOW
 COLOR_RESET_ALL = colorama.Style.RESET_ALL
 
+
+def get_color(color):
+    if color == 'red':
+        return COLOR_FG_RED
+    if color == 'green':
+        return COLOR_FG_GREEN
+    if color == 'yellow':
+        return COLOR_FG_YELLOW
+    else:
+        return ''
+
+
 PRINTER_WIDTH = 80
 
 
@@ -59,15 +71,20 @@ def print_output_line(msg):
 
 def print_load_line(index, total, status, table, rows=None, execution_time=None,
                     truncate=False):
+    if execution_time is not None and rows is not None:
+        rows_per_sec = "at " + str(int(int(rows) / execution_time)) + " rows/sec"
+    else:
+        rows_per_sec = ""
     if index is None or total is None:
         progress = ''
     else:
         progress = '{} of {} '.format(index, total)
-    prefix = "{timestamp} | {progress}{status} {table}".format(
+    prefix = "{timestamp} | {progress}{status} {table} {rows_per_sec}".format(
         timestamp=get_timestamp(),
         progress=progress,
         status=status,
-        table=table)
+        table=table,
+        rows_per_sec=rows_per_sec)
 
     truncate_width = PRINTER_WIDTH - 3
     justified = prefix.ljust(PRINTER_WIDTH, ".")
@@ -76,9 +93,15 @@ def print_load_line(index, total, status, table, rows=None, execution_time=None,
 
     if execution_time is None:
         status_time = ""
+    #elif rows is None:
     else:
         status_time = " in {execution_time:0.2f}s".format(
             execution_time=execution_time)
+#    else:
+#        rows_per_sec = str(int(int(rows) / execution_time))
+#        status_time = " rows in {execution_time:0.2f}s ({rows_per_sec} /sec)".format(
+#            execution_time=execution_time,
+#            rows_per_sec=rows_per_sec)
 
     if status == "DONE":
         rows = COLOR_FG_GREEN + rows + COLOR_RESET_ALL
@@ -88,6 +111,15 @@ def print_load_line(index, total, status, table, rows=None, execution_time=None,
 
     output = "{justified} [{output}{status_time}]".format(
         justified=justified, output=output_txt, status_time=status_time)
+    #output = "{justified} [{output}]".format(
+    #    justified=justified, output=output_txt)
 
     logger.info(output)
+
+
+def print_msg(msg, color=None):
+    if color:
+        color = get_color(color)
+        msg = color + msg + COLOR_RESET_ALL
+    logger.info(msg)
 

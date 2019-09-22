@@ -13,8 +13,11 @@ def run_project(project_name, connections_path=None):
     connections_config = utils.get_connections(connections_path)
     project_config = utils.get_project(project_name)
 
-    source_conninfo = connections_config[project_config['source']]
-    target_conninfo = connections_config[project_config['target']]
+    source_name = project_config['source']
+    target_name = project_config['target']
+
+    source_conninfo = connections_config[source_name]
+    target_conninfo = connections_config[target_name]
 
     project = project_config.copy()
     del project['schemas']
@@ -25,6 +28,7 @@ def run_project(project_name, connections_path=None):
     temp_path = utils.create_path(temp_path)
 
     # Lists of load settings
+    load_orders = []
     project_names = []
     source_conninfos = []
     target_conninfos = []
@@ -37,6 +41,7 @@ def run_project(project_name, connections_path=None):
     for schema_config in project_config['schemas']:
         schema = schema_config.copy()
         del schema['tables']
+        order_num = 1
         for table in schema_config['tables']:
             source_conninfo_item = source_conninfo
             target_conninfo_item = target_conninfo
@@ -44,6 +49,8 @@ def run_project(project_name, connections_path=None):
             schema_item = schema
             table_item = table
 
+            load_orders.append(order_num)
+            order_num += 1
             project_names.append(project_name)
             source_conninfos.append(source_conninfo_item)
             target_conninfos.append(target_conninfo_item)
@@ -53,8 +60,21 @@ def run_project(project_name, connections_path=None):
             temp_paths.append(temp_path)
 
     # Parallel load settings
-    workers = project.get('parallel_loads', 1)
     num_tables_to_load = len(tables)
+
+    num_tables_to_loads = []
+    for i in range(num_tables_to_load):
+        num_tables_to_loads.append(num_tables_to_load)
+
+    workers = project.get('parallel_loads', 1)
+
+    printer.print_msg('Running ' + project_name
+                      + ' with ' + str(num_tables_to_load) + ' loadjobs from '
+                      + source_name + ' to ' + target_name
+                      )
+    printer.print_msg('')
+
+
     if num_tables_to_load < workers:
         workers = num_tables_to_load
     start_msg = "Start loading " + str(num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
@@ -65,7 +85,7 @@ def run_project(project_name, connections_path=None):
 
     # Execute parallel load
     with Executor(max_workers=workers) as executor:
-        for _ in executor.map(run_load, project_names, source_conninfos, target_conninfos,
+        for _ in executor.map(run_load, load_orders, num_tables_to_loads, project_names, source_conninfos, target_conninfos,
                               projects, temp_paths, schemas, tables):
             pass
 
@@ -78,11 +98,15 @@ def run_project(project_name, connections_path=None):
         execution_time=execution_time)
 
     end_msg = "Finished loading " + str(num_tables_to_load) + " tables in " + status_time
+    printer.print_output_line("")
     printer.print_output_line(end_msg)
     #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
 
+    printer.print_msg("")
+    printer.print_msg("Completed successfully", "green")
 
-def run_load(project_name, source_conninfo, target_conninfo, project, temp_path, schema, table):
+
+def run_load(load_order, num_tables_to_load, project_name, source_conninfo, target_conninfo, project, temp_path, schema, table):
     load_start_time = time.time()
 
     import eneel.logger as logger
@@ -138,8 +162,8 @@ def run_load(project_name, source_conninfo, target_conninfo, project, temp_path,
     replication_method = table.get('replication_method')
 
     if not replication_method or replication_method == "FULL_TABLE":
-        index = 1
-        total = 2
+        index = load_order
+        total = num_tables_to_load
         status = "START"
         printer.print_load_line(index, total, status, full_source_table)
         #start_table_load_msg = "Start loading: " + full_source_table + " using FULL_TABLE replication"
@@ -163,8 +187,8 @@ def run_load(project_name, source_conninfo, target_conninfo, project, temp_path,
         #printer.print_fancy_output_line(msg, import_status, 1, 2)
 
     elif replication_method == "INCREMENTAL":
-        index = 1
-        total = 2
+        index = load_order
+        total = num_tables_to_load
         status = "START"
         printer.print_load_line(index, total, status, full_source_table)
 
