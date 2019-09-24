@@ -207,23 +207,17 @@ class Database:
             file_name = self._database + "_" + schema + "_" + table + ".csv"
             file_path = os.path.join(path, file_name)
 
-
-
-            #schema_table = schema + '.' + table
-
+            # Create and run the cmd
             sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
             file = open(file_path, "w")
-            self.cursor.copy_expert(sql=sql % (select_stmt, delimiter), file=file)
+            try:
+                self.cursor.copy_expert(sql=sql % (select_stmt, delimiter), file=file)
+            except psycopg2.Error as e:
+                logger.error(e)
 
             row_count = self.cursor.rowcount
 
-            msg = str(row_count) + " records exported"
-            #logger.info(msg)
-
-            #printer.print_fancy_output_line(msg, "OK", 1, 2)
-
-
-            #cmd = "COPY (" + select_stmt + ") TO '" + file_path + "' With CSV DELIMITER '" + delimiter + "';"
+            logger.debug(str(row_count) + " records exported")
 
             return file_path, delimiter
         except:

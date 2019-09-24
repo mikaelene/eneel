@@ -70,7 +70,7 @@ def print_output_line(msg):
 
 
 def print_load_line(index, total, status, table, rows=None, execution_time=None,
-                    truncate=False):
+                    truncate=False, msg=''):
     if execution_time is not None and rows is not None:
         rows_per_sec = "at " + str(int(int(rows) / execution_time)) + " rows/sec"
     else:
@@ -79,12 +79,13 @@ def print_load_line(index, total, status, table, rows=None, execution_time=None,
         progress = ''
     else:
         progress = '{} of {} '.format(index, total)
-    prefix = "{timestamp} | {progress}{status} {table} {rows_per_sec}".format(
+    prefix = "{timestamp} | {progress}{status} {table} {rows_per_sec}{msg}".format(
         timestamp=get_timestamp(),
         progress=progress,
         status=status,
         table=table,
-        rows_per_sec=rows_per_sec)
+        rows_per_sec=rows_per_sec,
+        msg=msg)
 
     truncate_width = PRINTER_WIDTH - 3
     justified = prefix.ljust(PRINTER_WIDTH, ".")
@@ -106,13 +107,13 @@ def print_load_line(index, total, status, table, rows=None, execution_time=None,
     if status == "DONE":
         rows = COLOR_FG_GREEN + rows + COLOR_RESET_ALL
         output_txt = rows
+    elif status == "ERROR":
+        output_txt = COLOR_FG_RED + status + COLOR_RESET_ALL
     else:
         output_txt = "RUN"
 
     output = "{justified} [{output}{status_time}]".format(
         justified=justified, output=output_txt, status_time=status_time)
-    #output = "{justified} [{output}]".format(
-    #    justified=justified, output=output_txt)
 
     logger.info(output)
 

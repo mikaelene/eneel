@@ -192,19 +192,17 @@ class Database:
             file_name = self._database + "_" + schema + "_" + table + ".csv"
             file_path = os.path.join(path, file_name)
 
-            spool_cmd = "set colsep '" + delimiter + "'"
+            #spool_cmd = "set colsep '" + delimiter + "'"
 
-            spool_cmd += """
-set HEADING OFF
-SET FEEDBACK OFF
-set WRAP OFF
-set COLSEP ,
-SET LINESIZE 32767
-set NEWPAGE none
-set UNDERLINE OFF
-set TRIMSPOOL ON
-set PAGESIZE 50000
-SET TERMOUT OFF
+            spool_cmd = """set markup csv on quote off
+set term off
+set echo off
+set trimspool on 
+set trimout on
+set feedback off
+Set serveroutput off
+set heading off
+set arraysize 5000
 spool """
 
             spool_cmd += file_path + '\n'

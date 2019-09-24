@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import shutil
 import yaml
@@ -89,10 +90,14 @@ def get_connections(connections_path=None):
 
 
 def get_project(project):
-    project_file_contents = load_file_contents(project + '.yml', strip=False)
-    project = load_yaml(project_file_contents)
+    try:
+        project_file_contents = load_file_contents(project + '.yml', strip=False)
+        project = load_yaml(project_file_contents)
 
-    return project
+        return project
+    except:
+        logger.error(project + ".yml not found")
+        sys.exit(-1)
 
 
 def run_cmd(cmd):
