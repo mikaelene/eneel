@@ -179,7 +179,7 @@ class Database:
             max_value = self.query(sql)
             return max_value[0][0]
         except:
-            logger.error("Failed getting max column value")
+            logger.debug("Failed getting max column value")
 
     def export_table(self, schema, table, columns, path, delimiter=',', replication_key=None, max_replication_key=None):
         try:

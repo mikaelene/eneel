@@ -175,7 +175,7 @@ class Database:
             logger.debug("Max " + column + " is " + str(max_value[0][0]))
             return max_value[0][0]
         except:
-            logger.error("Failed getting max column value")
+            logger.debug("Failed getting max column value")
 
     def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None, codepage='1252'):
         try:

@@ -92,10 +92,11 @@ def run_project(project_name, connections_path=None):
 
     load_errors = 0
     load_successes = 0
+
     for load_result in load_results:
         if load_result == 'error':
             load_errors += 1
-        if load_results == 'success':
+        if load_result == 'success':
             load_successes += 1
 
     # Clean up temp dir
@@ -269,5 +270,6 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
     execution_time = time.time() - load_start_time
     printer.print_load_line(index, total, status, full_source_table, rows, execution_time)
     return_code = 'success'
+    print(return_code)
     return return_code
 
