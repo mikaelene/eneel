@@ -37,14 +37,17 @@ def run_project(project_name, connections_path=None, target=None):
         for result in executor.map(run_load, project.loads):
             load_results.append(result)
 
-    load_errors = 0
     load_successes = 0
+    load_warnings = 0
+    load_errors = 0
 
     for load_result in load_results:
-        if load_result == 'error':
-            load_errors += 1
-        if load_result == 'success':
+        if load_result == 'DONE':
             load_successes += 1
+        if load_result == 'WARN':
+            load_warnings += 1
+        if load_result == 'ERROR':
+            load_errors += 1
 
     # Clean up temp dir
     if not project.keep_tempfiles:
@@ -55,8 +58,10 @@ def run_project(project_name, connections_path=None, target=None):
     status_time = " in {execution_time:0.2f}s".format(
         execution_time=execution_time)
 
-    end_msg = "Finished loading " + str(load_successes) + " of " + str(project.num_tables_to_load) + \
-              " tables successfully in " + status_time
+    end_msg = "Finished loading " + str(project.num_tables_to_load) + " tables in " + status_time + ": " + \
+                                                            str(load_successes) + " successfull, " + \
+                                                            str(load_warnings) + " with warnings and " + \
+                                                            str(load_errors) + " with errors"
     printer.print_output_line("")
     printer.print_output_line(end_msg)
     #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
@@ -64,6 +69,8 @@ def run_project(project_name, connections_path=None, target=None):
     printer.print_msg("")
     if load_errors > 0:
         printer.print_msg("Completed with errors", "red")
+    elif load_warnings > 0:
+        printer.print_msg("Completed with warnings", "yellow")
     else:
         printer.print_msg("Completed successfully", "green")
 
@@ -79,7 +86,7 @@ def run_load(project_load):
     schema = project_load.get('schema')
     table = project_load.get('table')
 
-    return_code = 'error'
+    return_code = 'ERROR'
 
     load_start_time = time.time()
 
@@ -158,7 +165,7 @@ def run_load(project_load):
             target.create_table_from_columns(target_schema, target_table_tmp, columns)
 
             # Import into temp table
-            import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+            return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
 
             # Switch tables
             target.switch_tables(target_schema, target_table, target_table_tmp)
@@ -191,7 +198,7 @@ def run_load(project_load):
                 # Create temp table
                 target.create_table_from_columns(target_schema, target_table_tmp, columns)
                 # Import into temp table
-                import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+                return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
                 # Switch tables
                 target.switch_tables(target_schema, target_table, target_table_tmp)
 
@@ -202,7 +209,7 @@ def run_load(project_load):
                 # Create temp table
                 target.create_table_from_columns(target_schema, target_table_tmp, columns)
                 # Import into temp table
-                import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+                return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
                 # Insert into and drop
                 target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
 
@@ -222,10 +229,9 @@ def run_load(project_load):
     source.close()
     target.close()
 
-    status = import_status
     rows = import_row_count
     execution_time = time.time() - load_start_time
-    printer.print_load_line(index, total, status, full_source_table, rows, execution_time)
-    return_code = 'success'
+    printer.print_load_line(index, total, return_code, full_source_table, rows, execution_time)
+
     return return_code
 
