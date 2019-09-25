@@ -31,7 +31,7 @@ Make sure you have the cli-tools for your required databases then:
     python setup.py install
 
 ## Configuration
-After installation an example connections.yml file will be in your home directory (~/.eneel). That's where you configure your connection info to your sources and targets.
+After installation an example [connections.yml](connections.yml) file will be in your home directory (~/.eneel). That's where you configure your connection info to your sources and targets.
 
 Next, create a [project configuration file](example_project.yml) in a directory for you EL projects.
 
