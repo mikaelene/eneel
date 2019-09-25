@@ -1,6 +1,7 @@
 # Connection details to an Postgres database
 postgres1:
   type: postgres
+  read_only: False                        # Will disable SQL and DML modifications
   outputs:
     dev:
       host: localhost
@@ -9,7 +10,6 @@ postgres1:
       password: secret_password
       database: my_db
       limit_rows: 100                         # Will limit all exports to 100 rows
-      read_only: False                        # Will disable SQL and DML modifications
     prod:
       host: prodserver_host
       port: 5432
