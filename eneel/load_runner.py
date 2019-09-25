@@ -58,7 +58,7 @@ def run_project(project_name, connections_path=None, target=None):
     status_time = " in {execution_time:0.2f}s".format(
         execution_time=execution_time)
 
-    end_msg = "Finished loading " + str(num_tables_to_load) + " tables in " + status_time + ": " + \
+    end_msg = "Finished loading " + str(project.num_tables_to_load) + " tables in " + status_time + ": " + \
                                                             str(load_successes) + " successfull, " + \
                                                             str(load_warnings) + " with warnings and " + \
                                                             str(load_errors) + " with errors"
