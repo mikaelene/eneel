@@ -15,7 +15,7 @@ class Database:
             if trusted_connection:
                 conn_string += ";trusted_connection=yes"
             else:
-                 conn_string += ";UID=" + user + ";PWD=" + password
+                conn_string += ";UID=" + user + ";PWD=" + password
             self._server = server
             self._user = user
             self._password = password

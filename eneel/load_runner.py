@@ -1,7 +1,7 @@
 import eneel.utils as utils
+import eneel.config as config
 from concurrent.futures import ProcessPoolExecutor as Executor
 import os
-import sys
 import eneel.printer as printer
 import time
 
@@ -11,8 +11,8 @@ logger = logging.getLogger('main_logger')
 
 def run_project(project_name, connections_path=None):
     # Get configurations
-    connections_config = utils.get_connections(connections_path)
-    project_config = utils.get_project(project_name)
+    connections_config = config.get_connections(connections_path)
+    project_config = config.get_project(project_name)
 
 
     source_name = project_config['source']
@@ -133,8 +133,8 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
     for handler in logger.handlers[2:]:
         logger.removeHandler(handler)
 
-    source = utils.connection_from_config(source_conninfo)
-    target = utils.connection_from_config(target_conninfo)
+    source = config.connection_from_config(source_conninfo)
+    target = config.connection_from_config(target_conninfo)
 
     # Delimiter
     csv_delimiter = project.get('csv_delimiter')
@@ -270,6 +270,5 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
     execution_time = time.time() - load_start_time
     printer.print_load_line(index, total, status, full_source_table, rows, execution_time)
     return_code = 'success'
-    print(return_code)
     return return_code
 
