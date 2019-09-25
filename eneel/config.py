@@ -131,14 +131,13 @@ class Project:
 
         self.temp_path = self.project.get('temp_path', 'temp')
         self.temp_path = self.temp_path + '/' + project_name
+        self.keep_tempfiles = self.project.get('keep_tempfiles', False)
 
         self.workers = self.project.get('parallel_loads', 1)
 
         self.loads = self.get_loads()
 
         self.num_tables_to_load = len(self.loads)
-
-
 
     def __enter__(self):
         return self

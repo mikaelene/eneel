@@ -1,5 +1,4 @@
 import eneel.utils as utils
-import eneel.config as config
 from concurrent.futures import ProcessPoolExecutor as Executor
 import os
 import eneel.printer as printer
@@ -12,67 +11,74 @@ logger = logging.getLogger('main_logger')
 
 def run_project(project_name, connections_path=None, target=None):
     # Connections
-    Connections = config.Connections(connections_path, target)
+    connections = config.Connections(connections_path, target)
 
     # Project
-    Project = config.Project(project_name, Connections.connections)
+    project = config.Project(project_name, connections.connections)
 
-    printer.print_msg('Running ' + Project.project_name
-                      + ' with ' + str(Project.num_tables_to_load) + ' loadjobs from '
-                      + Project.source_name + ' to ' + Project.target_name
+    printer.print_msg('Running ' + project.project_name
+                      + ' with ' + str(project.num_tables_to_load) + ' loadjobs from '
+                      + project.source_name + ' to ' + project.target_name
                       )
     printer.print_msg('')
 
-    workers = Project.workers
+    workers = project.workers
 
-
-
-    if Project.num_tables_to_load < workers:
-        workers = Project.num_tables_to_load
-    start_msg = "Start loading " + str(Project.num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
+    if project.num_tables_to_load < workers:
+        workers = project.num_tables_to_load
+    start_msg = "Start loading " + str(project.num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
     printer.print_output_line(start_msg)
 
     job_start_time = time.time()
 
     # Execute parallel load
     load_results = []
-    # with Executor(max_workers=workers) as executor:
-    #     for result in executor.map(run_load, load_orders, num_tables_to_loads, project_names, source_conninfos, target_conninfos,
-    #                           projects, temp_paths, schemas, tables):
-    #         load_results.append(result)
-    #
-    # load_errors = 0
-    # load_successes = 0
-    #
-    # for load_result in load_results:
-    #     if load_result == 'error':
-    #         load_errors += 1
-    #     if load_result == 'success':
-    #         load_successes += 1
-    #
-    # # Clean up temp dir
-    # if not project.get('keep_tempfiles', False):
-    #     utils.delete_path(temp_path)
-    #
-    # execution_time = time.time() - job_start_time
-    #
-    # status_time = " in {execution_time:0.2f}s".format(
-    #     execution_time=execution_time)
-    #
-    # end_msg = "Finished loading " + str(load_successes) + " of " + str(num_tables_to_load) + \
-    #           " tables successfully in " + status_time
-    # printer.print_output_line("")
-    # printer.print_output_line(end_msg)
-    # #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
-    #
-    # printer.print_msg("")
-    # if load_errors > 0:
-    #     printer.print_msg("Completed with errors", "red")
-    # else:
-    #     printer.print_msg("Completed successfully", "green")
+    with Executor(max_workers=workers) as executor:
+        for result in executor.map(run_load, project.loads):
+            load_results.append(result)
+
+    load_errors = 0
+    load_successes = 0
+
+    for load_result in load_results:
+        if load_result == 'error':
+            load_errors += 1
+        if load_result == 'success':
+            load_successes += 1
+
+    # Clean up temp dir
+    if not project.keep_tempfiles:
+        utils.delete_path(project.temp_path)
+
+    execution_time = time.time() - job_start_time
+
+    status_time = " in {execution_time:0.2f}s".format(
+        execution_time=execution_time)
+
+    end_msg = "Finished loading " + str(load_successes) + " of " + str(project.num_tables_to_load) + \
+              " tables successfully in " + status_time
+    printer.print_output_line("")
+    printer.print_output_line(end_msg)
+    #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
+
+    printer.print_msg("")
+    if load_errors > 0:
+        printer.print_msg("Completed with errors", "red")
+    else:
+        printer.print_msg("Completed successfully", "green")
 
 
-def run_load(load_order, num_tables_to_load, project_name, source_conninfo, target_conninfo, project, temp_path, schema, table):
+def run_load(project_load):
+    load_order = project_load.get('load_order')
+    num_tables_to_load = project_load.get('num_tables_to_load')
+    project_name = project_load.get('project_name')
+    source_conninfo = project_load.get('source_conninfo')
+    target_conninfo = project_load.get('target_conninfo')
+    project = project_load.get('project')
+    temp_path = project_load.get('temp_path')
+    schema = project_load.get('schema')
+    table = project_load.get('table')
+
     return_code = 'error'
 
     load_start_time = time.time()
