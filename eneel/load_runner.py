@@ -58,7 +58,7 @@ def run_project(project_name, connections_path=None, target=None):
     status_time = " in {execution_time:0.2f}s".format(
         execution_time=execution_time)
 
-    end_msg = "Finished loading " + str(project.num_tables_to_load) + " tables in " + status_time + ": " + \
+    end_msg = "Finished loading " + str(num_tables_to_load) + " tables in " + status_time + ": " + \
                                                             str(load_successes) + " successfull, " + \
                                                             str(load_warnings) + " with warnings and " + \
                                                             str(load_errors) + " with errors"
@@ -152,9 +152,9 @@ def run_load(project_load):
     if not replication_method or replication_method == "FULL_TABLE":
         index = load_order
         total = num_tables_to_load
-        status = "START"
+        return_code = "START"
         table_msg = full_source_table + " (" + "FULL_TABLE" + ")"
-        printer.print_load_line(index, total, status, table_msg)
+        printer.print_load_line(index, total, return_code, table_msg)
 
         # Export table
         try:
@@ -178,9 +178,9 @@ def run_load(project_load):
         try:
             index = load_order
             total = num_tables_to_load
-            status = "START"
+            return_code = "START"
             table_msg = full_source_table + " (" + replication_method + ")"
-            printer.print_load_line(index, total, status, table_msg)
+            printer.print_load_line(index, total, return_code, table_msg)
 
             replication_key = table.get('replication_key')
             if not replication_key:

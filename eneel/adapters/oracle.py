@@ -155,13 +155,11 @@ class Database:
 
     def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None):
         try:
-            #columns = self.table_columns(schema, table)
-
             # Generate SQL statement for extract
             select_stmt = "SELECT "
             for col in columns[:-1]:
                 column_name = col[1]
-                select_stmt += column_name + " || '" + delimiter + "' || "
+                select_stmt += "REPLACE(" + column_name + ",chr(0),'')" + " || '" + delimiter + "' || "
             last_column_name = columns[-1:][0][1]
             select_stmt += last_column_name
             select_stmt += ' FROM ' + schema + "." + table
@@ -192,18 +190,16 @@ class Database:
             file_name = self._database + "_" + schema + "_" + table + ".csv"
             file_path = os.path.join(path, file_name)
 
-            #spool_cmd = "set colsep '" + delimiter + "'"
-
             spool_cmd = """set markup csv on quote off
-set term off
-set echo off
-set trimspool on 
-set trimout on
-set feedback off
-Set serveroutput off
-set heading off
-set arraysize 5000
-spool """
+            set term off
+            set echo off
+            set trimspool on 
+            set trimout on
+            set feedback off
+            Set serveroutput off
+            set heading off
+            set arraysize 5000
+            spool """
 
             spool_cmd += file_path + '\n'
             spool_cmd += select_stmt

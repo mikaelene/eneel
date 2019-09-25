@@ -282,10 +282,13 @@ class Database:
                 try:
                     return_message = cmd_message.splitlines()
                     row_count = str(return_message[-3].split()[0])
+                    try:
+                        if return_message[2].split()[0] == 'SQLState':
+                            return "WARN", row_count
+                    except:
+                        pass
+
                     return "DONE", row_count
-                    #timing = str(return_message[-1].split()[5])
-                    #average = str(return_message[-1].split()[8][1:-3])
-                    #logger.debug(table + ": " + row_count + " rows imported, in " + timing + " ms. at an average of " + average + " rows per sec")
                 except:
                     logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
                     return "DONE", None
