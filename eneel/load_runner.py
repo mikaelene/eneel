@@ -64,7 +64,6 @@ def run_project(project_name, connections_path=None, target=None):
                                                             str(load_errors) + " with errors"
     printer.print_output_line("")
     printer.print_output_line(end_msg)
-    #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
 
     printer.print_msg("")
     if load_errors > 0:

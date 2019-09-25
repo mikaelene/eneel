@@ -9,6 +9,7 @@ postgres1:
       password: secret_password
       database: my_db
       limit_rows: 100                         # Will limit all exports to 100 rows
+      read_only: False                        # Will disable SQL and DML modifications
     prod:
       host: prodserver_host
       port: 5432
@@ -26,7 +27,7 @@ sqlserver1:
       host: localhost
       port: 1433
       trusted_connection: True                # Use logged in user for credentials
-      as_columnstore: True                    # Create tables as Clustered Columnstore Index
+      as_columnstore: True                    # Create tables as Clustered Columnstore Index (SQL Server only)
       database: my_db
       limit_rows: 100
     prod:

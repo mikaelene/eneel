@@ -1,18 +1,20 @@
 # Project info
-id: project id
-name: project name
-owner: somebody@yourcompany.com
-temp_path: /tempfiles                     # The directory to use for temp csv files during load
-csv_delimiter: "|"                        # The delimiter to use in the csv files
+id: project id                            # OPTIONAL and currently not used
+name: project name                        # OPTIONAL and currently not used
+owner: somebody@yourcompany.com           # OPTIONAL and currently not used
+temp_path: /tempfiles                     # The directory to use for temp csv files during load (OPTIONAL: default=run_path/temp )
+csv_delimiter: "|"                        # The delimiter to use in the csv files (OPTIONAL: default=| )
 
 # Connection details
-source: postgres1
-target: sqlserver1
+source: postgres1                         # A Connection name in connections.yml
+target: sqlserver1                        # A Connection name in connections.yml
 
 # Source to Destination Schema mapping
 schemas:
   - source_schema: "public"               # You can replicate from multiple schemas
     target_schema: "public_tgt"           # Target schema
+    table_prefix: "pre_"                  # Prefix for all created tables name (OPTIONAL)
+    table_suffix: "suf_"                  # Suffix for all created tables name (OPTIONAL)
     tables:                               # List Tables to replicate
       - table_name: "customer"            # Source table name
         replication_method: FULL_TABLE    # FULL_TABLE replication. Will recreate the table on each load

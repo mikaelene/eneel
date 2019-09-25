@@ -24,6 +24,7 @@ setup(
         'psycopg2>=2.7.7',
         'cx-Oracle>=7.0.0',
         'PyYAML>=3.11',
+        'colorama>=0.3.9',
     ],
     entry_points={
             'console_scripts': ['eneel=eneel.main:main'],
