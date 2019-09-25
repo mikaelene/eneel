@@ -1,84 +1,32 @@
 import eneel.utils as utils
 from concurrent.futures import ProcessPoolExecutor as Executor
 import os
-import sys
 import eneel.printer as printer
 import time
+import eneel.config as config
 
 import logging
 logger = logging.getLogger('main_logger')
 
 
-def run_project(project_name, connections_path=None):
-    # Get configurations
-    connections_config = utils.get_connections(connections_path)
-    project_config = utils.get_project(project_name)
+def run_project(project_name, connections_path=None, target=None):
+    # Connections
+    connections = config.Connections(connections_path, target)
 
+    # Project
+    project = config.Project(project_name, connections.connections)
 
-    source_name = project_config['source']
-    target_name = project_config['target']
-
-    source_conninfo = connections_config[source_name]
-    target_conninfo = connections_config[target_name]
-
-    project = project_config.copy()
-    del project['schemas']
-
-    # Create temp dir
-    temp_path = project.get('temp_path', 'temp')
-    temp_path = temp_path + '/' + project_name
-    temp_path = utils.create_path(temp_path)
-
-    # Lists of load settings
-    load_orders = []
-    project_names = []
-    source_conninfos = []
-    target_conninfos = []
-    projects = []
-    schemas = []
-    tables = []
-    temp_paths = []
-
-    # Populate load settings
-    for schema_config in project_config['schemas']:
-        schema = schema_config.copy()
-        del schema['tables']
-        order_num = 1
-        for table in schema_config['tables']:
-            source_conninfo_item = source_conninfo
-            target_conninfo_item = target_conninfo
-            project_item = project
-            schema_item = schema
-            table_item = table
-
-            load_orders.append(order_num)
-            order_num += 1
-            project_names.append(project_name)
-            source_conninfos.append(source_conninfo_item)
-            target_conninfos.append(target_conninfo_item)
-            projects.append(project_item)
-            schemas.append(schema_item)
-            tables.append(table_item)
-            temp_paths.append(temp_path)
-
-    # Parallel load settings
-    num_tables_to_load = len(tables)
-
-    num_tables_to_loads = []
-    for i in range(num_tables_to_load):
-        num_tables_to_loads.append(num_tables_to_load)
-
-    workers = project.get('parallel_loads', 1)
-
-    printer.print_msg('Running ' + project_name
-                      + ' with ' + str(num_tables_to_load) + ' loadjobs from '
-                      + source_name + ' to ' + target_name
+    printer.print_msg('Running ' + project.project_name
+                      + ' with ' + str(project.num_tables_to_load) + ' loadjobs from '
+                      + project.source_name + ' to ' + project.target_name
                       )
     printer.print_msg('')
 
-    if num_tables_to_load < workers:
-        workers = num_tables_to_load
-    start_msg = "Start loading " + str(num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
+    workers = project.workers
+
+    if project.num_tables_to_load < workers:
+        workers = project.num_tables_to_load
+    start_msg = "Start loading " + str(project.num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
     printer.print_output_line(start_msg)
 
     job_start_time = time.time()
@@ -86,8 +34,7 @@ def run_project(project_name, connections_path=None):
     # Execute parallel load
     load_results = []
     with Executor(max_workers=workers) as executor:
-        for result in executor.map(run_load, load_orders, num_tables_to_loads, project_names, source_conninfos, target_conninfos,
-                              projects, temp_paths, schemas, tables):
+        for result in executor.map(run_load, project.loads):
             load_results.append(result)
 
     load_successes = 0
@@ -103,8 +50,8 @@ def run_project(project_name, connections_path=None):
             load_errors += 1
 
     # Clean up temp dir
-    if not project.get('keep_tempfiles', False):
-        utils.delete_path(temp_path)
+    if not project.keep_tempfiles:
+        utils.delete_path(project.temp_path)
 
     execution_time = time.time() - job_start_time
 
@@ -128,7 +75,17 @@ def run_project(project_name, connections_path=None):
         printer.print_msg("Completed successfully", "green")
 
 
-def run_load(load_order, num_tables_to_load, project_name, source_conninfo, target_conninfo, project, temp_path, schema, table):
+def run_load(project_load):
+    load_order = project_load.get('load_order')
+    num_tables_to_load = project_load.get('num_tables_to_load')
+    project_name = project_load.get('project_name')
+    source_conninfo = project_load.get('source_conninfo')
+    target_conninfo = project_load.get('target_conninfo')
+    project = project_load.get('project')
+    temp_path = project_load.get('temp_path')
+    schema = project_load.get('schema')
+    table = project_load.get('table')
+
     return_code = 'ERROR'
 
     load_start_time = time.time()
@@ -140,8 +97,8 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
     for handler in logger.handlers[2:]:
         logger.removeHandler(handler)
 
-    source = utils.connection_from_config(source_conninfo)
-    target = utils.connection_from_config(target_conninfo)
+    source = config.connection_from_config(source_conninfo)
+    target = config.connection_from_config(target_conninfo)
 
     # Delimiter
     csv_delimiter = project.get('csv_delimiter')
