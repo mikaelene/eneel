@@ -4,121 +4,72 @@ from concurrent.futures import ProcessPoolExecutor as Executor
 import os
 import eneel.printer as printer
 import time
+import eneel.config as config
 
 import logging
 logger = logging.getLogger('main_logger')
 
 
-def run_project(project_name, connections_path=None):
-    # Get configurations
-    connections_config = config.get_connections(connections_path)
-    project_config = config.get_project(project_name)
+def run_project(project_name, connections_path=None, target=None):
+    # Connections
+    Connections = config.Connections(connections_path, target)
 
+    # Project
+    Project = config.Project(project_name, Connections.connections)
 
-    source_name = project_config['source']
-    target_name = project_config['target']
-
-    source_conninfo = connections_config[source_name]
-    target_conninfo = connections_config[target_name]
-
-    project = project_config.copy()
-    del project['schemas']
-
-    # Create temp dir
-    temp_path = project.get('temp_path', 'temp')
-    temp_path = temp_path + '/' + project_name
-    temp_path = utils.create_path(temp_path)
-
-    # Lists of load settings
-    load_orders = []
-    project_names = []
-    source_conninfos = []
-    target_conninfos = []
-    projects = []
-    schemas = []
-    tables = []
-    temp_paths = []
-
-    # Populate load settings
-    for schema_config in project_config['schemas']:
-        schema = schema_config.copy()
-        del schema['tables']
-        order_num = 1
-        for table in schema_config['tables']:
-            source_conninfo_item = source_conninfo
-            target_conninfo_item = target_conninfo
-            project_item = project
-            schema_item = schema
-            table_item = table
-
-            load_orders.append(order_num)
-            order_num += 1
-            project_names.append(project_name)
-            source_conninfos.append(source_conninfo_item)
-            target_conninfos.append(target_conninfo_item)
-            projects.append(project_item)
-            schemas.append(schema_item)
-            tables.append(table_item)
-            temp_paths.append(temp_path)
-
-    # Parallel load settings
-    num_tables_to_load = len(tables)
-
-    num_tables_to_loads = []
-    for i in range(num_tables_to_load):
-        num_tables_to_loads.append(num_tables_to_load)
-
-    workers = project.get('parallel_loads', 1)
-
-    printer.print_msg('Running ' + project_name
-                      + ' with ' + str(num_tables_to_load) + ' loadjobs from '
-                      + source_name + ' to ' + target_name
+    printer.print_msg('Running ' + Project.project_name
+                      + ' with ' + str(Project.num_tables_to_load) + ' loadjobs from '
+                      + Project.source_name + ' to ' + Project.target_name
                       )
     printer.print_msg('')
 
-    if num_tables_to_load < workers:
-        workers = num_tables_to_load
-    start_msg = "Start loading " + str(num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
+    workers = Project.workers
+
+
+
+    if Project.num_tables_to_load < workers:
+        workers = Project.num_tables_to_load
+    start_msg = "Start loading " + str(Project.num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
     printer.print_output_line(start_msg)
 
     job_start_time = time.time()
 
     # Execute parallel load
     load_results = []
-    with Executor(max_workers=workers) as executor:
-        for result in executor.map(run_load, load_orders, num_tables_to_loads, project_names, source_conninfos, target_conninfos,
-                              projects, temp_paths, schemas, tables):
-            load_results.append(result)
-
-    load_errors = 0
-    load_successes = 0
-
-    for load_result in load_results:
-        if load_result == 'error':
-            load_errors += 1
-        if load_result == 'success':
-            load_successes += 1
-
-    # Clean up temp dir
-    if not project.get('keep_tempfiles', False):
-        utils.delete_path(temp_path)
-
-    execution_time = time.time() - job_start_time
-
-    status_time = " in {execution_time:0.2f}s".format(
-        execution_time=execution_time)
-
-    end_msg = "Finished loading " + str(load_successes) + " of " + str(num_tables_to_load) + \
-              " tables successfully in " + status_time
-    printer.print_output_line("")
-    printer.print_output_line(end_msg)
-    #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
-
-    printer.print_msg("")
-    if load_errors > 0:
-        printer.print_msg("Completed with errors", "red")
-    else:
-        printer.print_msg("Completed successfully", "green")
+    # with Executor(max_workers=workers) as executor:
+    #     for result in executor.map(run_load, load_orders, num_tables_to_loads, project_names, source_conninfos, target_conninfos,
+    #                           projects, temp_paths, schemas, tables):
+    #         load_results.append(result)
+    #
+    # load_errors = 0
+    # load_successes = 0
+    #
+    # for load_result in load_results:
+    #     if load_result == 'error':
+    #         load_errors += 1
+    #     if load_result == 'success':
+    #         load_successes += 1
+    #
+    # # Clean up temp dir
+    # if not project.get('keep_tempfiles', False):
+    #     utils.delete_path(temp_path)
+    #
+    # execution_time = time.time() - job_start_time
+    #
+    # status_time = " in {execution_time:0.2f}s".format(
+    #     execution_time=execution_time)
+    #
+    # end_msg = "Finished loading " + str(load_successes) + " of " + str(num_tables_to_load) + \
+    #           " tables successfully in " + status_time
+    # printer.print_output_line("")
+    # printer.print_output_line(end_msg)
+    # #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
+    #
+    # printer.print_msg("")
+    # if load_errors > 0:
+    #     printer.print_msg("Completed with errors", "red")
+    # else:
+    #     printer.print_msg("Completed successfully", "green")
 
 
 def run_load(load_order, num_tables_to_load, project_name, source_conninfo, target_conninfo, project, temp_path, schema, table):
