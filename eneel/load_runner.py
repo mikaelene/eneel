@@ -90,14 +90,17 @@ def run_project(project_name, connections_path=None):
                               projects, temp_paths, schemas, tables):
             load_results.append(result)
 
-    load_errors = 0
     load_successes = 0
+    load_warnings = 0
+    load_errors = 0
 
     for load_result in load_results:
-        if load_result == 'error':
-            load_errors += 1
-        if load_result == 'success':
+        if load_result == 'DONE':
             load_successes += 1
+        if load_result == 'WARN':
+            load_warnings += 1
+        if load_result == 'ERROR':
+            load_errors += 1
 
     # Clean up temp dir
     if not project.get('keep_tempfiles', False):
@@ -108,8 +111,10 @@ def run_project(project_name, connections_path=None):
     status_time = " in {execution_time:0.2f}s".format(
         execution_time=execution_time)
 
-    end_msg = "Finished loading " + str(load_successes) + " of " + str(num_tables_to_load) + \
-              " tables successfully in " + status_time
+    end_msg = "Finished loading " + str(num_tables_to_load) + " tables in " + status_time + ": " + \
+                                                            str(load_successes) + " successfull, " + \
+                                                            str(load_warnings) + " with warnings and " + \
+                                                            str(load_errors) + " with errors"
     printer.print_output_line("")
     printer.print_output_line(end_msg)
     #logger.info("Finished loading " + str(num_tables_to_load) + " tables ")
@@ -117,12 +122,14 @@ def run_project(project_name, connections_path=None):
     printer.print_msg("")
     if load_errors > 0:
         printer.print_msg("Completed with errors", "red")
+    elif load_warnings > 0:
+        printer.print_msg("Completed with warnings", "yellow")
     else:
         printer.print_msg("Completed successfully", "green")
 
 
 def run_load(load_order, num_tables_to_load, project_name, source_conninfo, target_conninfo, project, temp_path, schema, table):
-    return_code = 'error'
+    return_code = 'ERROR'
 
     load_start_time = time.time()
 
@@ -188,9 +195,9 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
     if not replication_method or replication_method == "FULL_TABLE":
         index = load_order
         total = num_tables_to_load
-        status = "START"
+        return_code = "START"
         table_msg = full_source_table + " (" + "FULL_TABLE" + ")"
-        printer.print_load_line(index, total, status, table_msg)
+        printer.print_load_line(index, total, return_code, table_msg)
 
         # Export table
         try:
@@ -201,7 +208,7 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
             target.create_table_from_columns(target_schema, target_table_tmp, columns)
 
             # Import into temp table
-            import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+            return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
 
             # Switch tables
             target.switch_tables(target_schema, target_table, target_table_tmp)
@@ -214,9 +221,9 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
         try:
             index = load_order
             total = num_tables_to_load
-            status = "START"
+            return_code = "START"
             table_msg = full_source_table + " (" + replication_method + ")"
-            printer.print_load_line(index, total, status, table_msg)
+            printer.print_load_line(index, total, return_code, table_msg)
 
             replication_key = table.get('replication_key')
             if not replication_key:
@@ -234,7 +241,7 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
                 # Create temp table
                 target.create_table_from_columns(target_schema, target_table_tmp, columns)
                 # Import into temp table
-                import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+                return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
                 # Switch tables
                 target.switch_tables(target_schema, target_table, target_table_tmp)
 
@@ -245,7 +252,7 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
                 # Create temp table
                 target.create_table_from_columns(target_schema, target_table_tmp, columns)
                 # Import into temp table
-                import_status, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+                return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
                 # Insert into and drop
                 target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
 
@@ -265,11 +272,9 @@ def run_load(load_order, num_tables_to_load, project_name, source_conninfo, targ
     source.close()
     target.close()
 
-    status = import_status
     rows = import_row_count
     execution_time = time.time() - load_start_time
-    printer.print_load_line(index, total, status, full_source_table, rows, execution_time)
-    return_code = 'success'
-    print(return_code)
+    printer.print_load_line(index, total, return_code, full_source_table, rows, execution_time)
+
     return return_code
 
