@@ -159,7 +159,7 @@ class Database:
             select_stmt = "SELECT "
             for col in columns[:-1]:
                 column_name = col[1]
-                select_stmt += "REPLACE(" + column_name + ",chr(0),'')" + " || '" + delimiter + "' || "
+                select_stmt += "REPLACE(" + column_name + ",chr(0),'')" + " || '" + delimiter + "' || \n"
             last_column_name = columns[-1:][0][1]
             select_stmt += last_column_name
             select_stmt += ' FROM ' + schema + "." + table

@@ -107,7 +107,7 @@ def print_load_line(index, total, status, table, rows=None, execution_time=None,
     if status == "DONE":
         rows = get_color('green') + rows + COLOR_RESET_ALL
         output_txt = rows
-    if status == "WARN":
+    elif status == "WARN":
         rows = get_color('yellow') + rows + COLOR_RESET_ALL
         output_txt = rows
     elif status == "ERROR":
