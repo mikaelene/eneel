@@ -199,6 +199,7 @@ class Database:
             Set serveroutput off
             set heading off
             set arraysize 5000
+            SET LONG 100000
             spool """
 
             spool_cmd += file_path + '\n'
