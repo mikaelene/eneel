@@ -159,10 +159,10 @@ class Project:
         temp_paths = []
 
         # Populate load settings
+        order_num = 1
         for schema_config in self.project_config['schemas']:
             schema = schema_config.copy()
             del schema['tables']
-            order_num = 1
             for table in schema_config['tables']:
                 source_conninfo_item = self.source_conninfo
                 target_conninfo_item = self.target_conninfo
