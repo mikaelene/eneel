@@ -4,6 +4,7 @@ import eneel.utils as utils
 import eneel.adapters.postgres as postgres
 import eneel.adapters.oracle as oracle
 import eneel.adapters.sqlserver as sqlserver
+import eneel.adapters.snowflake as snowflake
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -68,6 +69,11 @@ def connection_from_config(connection_info):
                                   as_columnstore, read_only)
     elif connection_info.get('type') == 'postgres':
         return postgres.Database(server, user, password, database, limit_rows, read_only)
+    elif connection_info.get('type') == 'snowflake':
+        account = connection_info['credentials'].get('account')
+        warehouse = connection_info['credentials'].get('warehouse')
+        schema = connection_info['credentials'].get('schema')
+        return snowflake.Database(account, user, password, database, warehouse, schema, limit_rows, read_only)
     else:
         logger.error('source type not found')
 
