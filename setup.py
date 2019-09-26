@@ -30,6 +30,6 @@ setup(
             'console_scripts': ['eneel=eneel.main:main'],
         },
     data_files = [
-        (eneel_path, ['connections.yml']),
+        (eneel_path, ['example_connections.yml']),
     ],
 )
