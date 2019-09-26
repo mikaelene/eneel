@@ -73,6 +73,8 @@ def run_cmd(cmd):
                          stderr=subprocess.STDOUT, universal_newlines=True)
     if res.returncode == 0:
         return res.returncode, res.stdout
+    elif res.stdout:
+        return res.returncode, res.stdout
     else:
         return res.returncode, res.stderr
 

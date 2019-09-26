@@ -130,7 +130,7 @@ class Project:
         del self.project['schemas']
 
         self.temp_path = self.project.get('temp_path', 'temp')
-        self.temp_path = self.temp_path + '/' + project_name
+        self.temp_path = os.path.join(self.temp_path , project_name)
         self.keep_tempfiles = self.project.get('keep_tempfiles', False)
 
         self.workers = self.project.get('parallel_loads', 1)

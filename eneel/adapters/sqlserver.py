@@ -284,6 +284,7 @@ class Database:
                     row_count = str(return_message[-3].split()[0])
                     try:
                         if return_message[2].split()[0] == 'SQLState':
+                            logger.debug(cmd_message)
                             return "WARN", row_count
                     except:
                         pass

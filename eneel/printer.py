@@ -105,10 +105,13 @@ def print_load_line(index, total, status, table, rows=None, execution_time=None,
 #            rows_per_sec=rows_per_sec)
 
     if status == "DONE":
-        rows = COLOR_FG_GREEN + rows + COLOR_RESET_ALL
+        rows = get_color('green') + rows + COLOR_RESET_ALL
+        output_txt = rows
+    if status == "WARN":
+        rows = get_color('yellow') + rows + COLOR_RESET_ALL
         output_txt = rows
     elif status == "ERROR":
-        output_txt = COLOR_FG_RED + status + COLOR_RESET_ALL
+        output_txt = get_color('red') + status + COLOR_RESET_ALL
     else:
         output_txt = "RUN"
 
