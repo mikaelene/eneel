@@ -21,10 +21,15 @@ def get_connections(connections_path=None, target=None):
             name = conn
             type = connections[name]['type']
             read_only = connections[name].get('read_only')
-            if not target:
-                target = connections[name]['target']
-            credentials = connections[name]['outputs'][target]
-            connection = {'name': conn, 'type': type, 'read_only': read_only, 'target': target, 'credentials': credentials}
+            # If target is set from cli. Use tha ttarget. Else use from connections.yml
+            if target:
+                target_out = target
+            else:
+                target_out = connections[name]['target']
+
+            credentials = connections[name]['outputs'][target_out]
+            connection = {'name': conn, 'type': type, 'read_only': read_only, 'target': target_out,
+                          'credentials': credentials}
 
             connections_dict[name] = connection
         return connections_dict
