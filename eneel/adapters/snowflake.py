@@ -1,6 +1,7 @@
 import os
 import sys
 import snowflake.connector
+import eneel.utils as utils
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -255,12 +256,12 @@ class Database:
             delete_schema_table = schema + "." + delete_table
 
             if self.check_table_exist(old_schema_table):
-                self.execute("ALTER TABLE " + old_schema_table + " RENAME TO " + delete_table)
-                self.execute("ALTER TABLE " + new_schema_table + " RENAME TO " + old_table)
+                self.execute("ALTER TABLE " + old_schema_table + " RENAME TO " + delete_schema_table)
+                self.execute("ALTER TABLE " + new_schema_table + " RENAME TO " + old_schema_table)
                 self.execute("DROP TABLE " + delete_schema_table)
                 logger.debug("Switched tables")
             else:
-                self.execute("ALTER TABLE " + new_schema_table + " RENAME TO " + old_table)
+                self.execute("ALTER TABLE " + new_schema_table + " RENAME TO " + old_schema_table)
                 logger.debug("Renamed temp table")
         except:
             logger.error("Failed to switch tables")
@@ -269,20 +270,42 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
         try:
+            schema = schema.upper()
+            table = table.upper()
             schema_table = schema + '.' + table
 
-            sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
-            file = open(file, "r")
+            # Tablename underscored
+            table_name_text = self._database + "_" + schema + "_" + table
 
-            try:
-                self.cursor.copy_expert(sql=sql % (schema_table, delimiter), file=file)
-            except snowflake.connector.Error as e:
-                logger.error(e)
-                return "ERROR", e
+            # Fileformat
+            table_format = table_name_text + '_format'
+            create_format_sql = "create or replace file format " + table_format + " type = 'CSV' field_delimiter = '" + delimiter + "' skip_header = 1; "
+            print(create_format_sql)
+            self.execute(create_format_sql)
+
+            # Stage
+            table_stage = table_name_text + '_stage'
+            create_stage_sql = "create or replace stage " + table_stage + " file_format = " + table_format + ";"
+            print(create_stage_sql)
+            self.execute(create_stage_sql)
+
+            # put
+            file_abs = utils.abs_path(file)
+            put_sql = "PUT file://" + file_abs + " @" + table_stage + " auto_compress=true;"
+            print(put_sql)
+            self.execute(put_sql)
+            file_name = file.split('/')[-1] + '.gz'
+
+            # copy
+            file_format = "type = 'CSV' field_delimiter = '" + delimiter + "' skip_header = 1"
+            copy_sql = "COPY INTO " + schema_table + " FROM @" + table_stage + "/" + file_name + " file_format = (format_name = " + table_format + ") on_error = 'skip_file';"
+            print(copy_sql)
+            self.execute(copy_sql)
+            print("copy table success")
 
             row_count = str(self.cursor.rowcount)
 
-            #logger.info(row_count+ " records imported")
+            logger.info(row_count+ " records imported")
 
             return "DONE", row_count
 

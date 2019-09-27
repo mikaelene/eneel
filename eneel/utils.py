@@ -25,6 +25,12 @@ def create_path(path_name):
     return abs_temp_file_dir
 
 
+def abs_path(path_name):
+    # Absolute path
+    abs_temp_file_dir = os.path.abspath(path_name)
+    return abs_temp_file_dir
+
+
 def delete_path(path_name):
     if os.path.exists(path_name):
         try:
