@@ -106,7 +106,10 @@ class Database:
         try:
             q = "select table_schema || '.' || table_name from information_schema.tables"
             tables = self.query(q)
-            return tables
+            tables_list = []
+            for table in tables:
+                tables_list.append(table[0])
+            return tables_list
         except:
             logger.error("Failed getting tables")
 
@@ -145,18 +148,16 @@ class Database:
 
     def check_table_exist(self, table_name):
         try:
-            check_statement = """
-            SELECT EXISTS (
-            SELECT 1
-            FROM   information_schema.tables 
-            WHERE  table_schema || '.' || table_name = '"""
-            check_statement += table_name + "')"
-            print(check_statement)
-            exists = self.execute(check_statement)
-            print(table_name + exists[0][0])
-            return exists[0][0]
+            table_name = table_name.upper()
+            if table_name in self.tables():
+                print('True')
+                return True
+            else:
+                print('False')
+                return False
         except:
             logger.error("Failed checking table exist")
+
 
     def truncate_table(self, table_name):
         if self._read_only:
@@ -172,6 +173,7 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
         try:
+            schema = schema.upper()
             if schema in self.schemas():
                 logger.debug("Schema exists")
             else:
@@ -326,15 +328,11 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
 
+        schema = schema.upper()
+        table = table.upper()
         full_table = schema + '.' + table
 
         try:
-        #    check_table_exist
-        #    table_exists = self.query("SELECT * FROM INFORMATION_SCHEMA.TABLES "
-        #                                "WHERE TABLE_SCHEMA = %s AND "
-        #                                "TABLE_NAME = %s", [schema, table])
-        #    #table_exists = self.fetchone()
-
             if self.check_table_exist(full_table):
                 print('creating table')
                 self.execute("DROP TABLE " + full_table)
