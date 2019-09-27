@@ -2,6 +2,7 @@ import os
 import sys
 import snowflake.connector
 import eneel.utils as utils
+from fsplit.filesplit import FileSplit
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -186,7 +187,7 @@ class Database:
 
     def get_max_column_value(self, table_name, column):
         try:
-            sql = "SELECT MAX(" + column + ")::text FROM " + table_name
+            sql = 'SELECT MAX("' + column + '")::text FROM ' + table_name
             max_value = self.query(sql)
             return max_value[0][0]
         except:
@@ -289,19 +290,41 @@ class Database:
             print(create_stage_sql)
             self.execute(create_stage_sql)
 
-            # put
+            # Split files
             file_abs = utils.abs_path(file)
-            put_sql = "PUT file://" + file_abs + " @" + table_stage + " auto_compress=true;"
+            file_name_local = file_abs.split('/')[-1]
+            file_dir = file_abs.replace(file_name_local, '')
+
+            fs = FileSplit(file=file_abs, splitsize=50000000, output_dir=file_dir)
+            fs.split()
+
+            os.remove(file_abs)
+
+            # put
+            files = file_abs[:-4] + '*.csv'
+            put_sql = "PUT file://" + files + " @" + table_stage + " auto_compress=true;"
             print(put_sql)
             self.execute(put_sql)
             file_name = file.split('/')[-1] + '.gz'
+            files_stage = files.split('/')[-1]
 
             # copy
-            file_format = "type = 'CSV' field_delimiter = '" + delimiter + "' skip_header = 1"
-            copy_sql = "COPY INTO " + schema_table + " FROM @" + table_stage + "/" + file_name + " file_format = (format_name = " + table_format + ") on_error = 'skip_file';"
+            copy_sql = "COPY INTO " + schema_table + " FROM @" + table_stage + " file_format = (format_name = " + table_format + ") on_error = 'skip_file';"
             print(copy_sql)
             self.execute(copy_sql)
             print("copy table success")
+
+            # remove stage
+            drop_stage_sql = "DROP STAGE IF EXISTS " + table_stage
+            print(drop_stage_sql)
+            self.execute(drop_stage_sql)
+            print("stage deleted")
+
+            # remove fileformat
+            drop_file_format_sql = "DROP FILE FORMAT IF EXISTS " + table_format
+            print(drop_file_format_sql)
+            self.execute(drop_file_format_sql)
+            print("format deleted")
 
             row_count = str(self.cursor.rowcount)
 
@@ -325,7 +348,7 @@ class Database:
                 numeric_precision = col[4]
                 numeric_scale = col[5]
 
-                column = column_name + " " + data_type
+                column = '"' + column_name + '"' + " " + data_type
                 if "char" in data_type:
                     column += "("
                     if character_maximum_length == -1:
@@ -335,10 +358,12 @@ class Database:
                     column += ")"
                 elif "numeric" in data_type:
                     column += "(" + str(numeric_precision) + "," + str(numeric_scale) + ")"
-                elif data_type == "USER-DEFINED":
+                elif data_type == "user-defined":
                     column = column_name + " TEXT"
-                elif data_type == "ARRAY":
+                elif data_type == "array":
                     column = column_name + " TEXT"
+                elif data_type == "bytea":
+                    column = column_name + " BINARY"
                 create_table_sql += column + ", \n"
             create_table_sql = create_table_sql[:-3]
             create_table_sql += ")"
@@ -362,6 +387,7 @@ class Database:
 
             self.create_schema(schema)
             create_table_sql = self.generate_create_table_ddl(schema, table, columns)
+            logger.debug(create_table_sql)
             self.execute(create_table_sql)
             logger.debug("table created")
         except:
