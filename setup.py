@@ -6,8 +6,8 @@ import os
 eneel_path = os.path.join(os.path.expanduser('~'), '.eneel')
 
 package_name = "eneel"
-package_version = "0.1.0"
-description = """A package for fast loading av relation data"""
+package_version = "0.1.1"
+description = """A package for fast loading av relational data"""
 
 setup(
     name=package_name,
