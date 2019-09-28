@@ -39,13 +39,19 @@ def get_connections(connections_path=None, target=None):
 
 def get_project(project):
     try:
-        project_file_contents = utils.load_file_contents(project + '.yml', strip=False)
+        project_file_contents = utils.load_file_contents(project, strip=False)
         project = utils.load_yaml(project_file_contents)
 
         return project
     except:
-        logger.error(project + ".yml not found")
-        sys.exit(-1)
+        try:
+            project_file_contents = utils.load_file_contents(project + '.yml', strip=False)
+            project = utils.load_yaml(project_file_contents)
+
+            return project
+        except:
+            logger.error(project + ".yml not found")
+            sys.exit(-1)
 
 
 def connection_from_config(connection_info):
@@ -80,7 +86,7 @@ class Connections:
 
         self.target = target
 
-        self.connections = get_connections()
+        self.connections = get_connections(self._connections_path)
 
     def __enter__(self):
         return self
@@ -90,28 +96,18 @@ class Connections:
             connections_file_contents = utils.load_file_contents(self._connections_path, strip=False)
             connections = utils.load_yaml(connections_file_contents)
 
-            print(connections)
-
             connections_dict = {}
             for conn in connections:
                 name = conn
                 type = connections[name]['type']
                 read_only = connections[name].get('read_only')
 
-                print(self._target)
-
                 if not self._target:
                     self._target = connections[name]['target']
-                    print(self._target)
                 credentials = connections[name]['outputs'][self._target]
-                print(credentials)
                 connection = {'name': conn, 'type': type, 'read_only': read_only, 'target': target,
                               'credentials': credentials}
-
-                print(connection)
-
                 connections_dict[name] = connection
-                print(connections_dict)
             return connections_dict
         except:
             logger.error("Could not load connections.yml")

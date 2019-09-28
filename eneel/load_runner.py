@@ -11,6 +11,7 @@ logger = logging.getLogger('main_logger')
 
 def run_project(project_name, connections_path=None, target=None):
     # Connections
+    print(connections_path)
     connections = config.Connections(connections_path, target)
 
     # Project
