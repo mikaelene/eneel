@@ -5,7 +5,8 @@ import argparse
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('project', help='The name of the project (i.e my_project for project.yml)')
-    parser.add_argument('--connections', help='Optinally add the full path to connections.yml')
+    parser.add_argument('--connections', help='Optionally add the full path to connections.yml')
+    parser.add_argument('--target', help='Optionally add the target. I.e prod')
 #    parser.add_argument('--logdir', help='For not using the default log directory')
     args = parser.parse_args()
 
@@ -18,6 +19,10 @@ def main():
             connections = args.connections
         else:
             connections = None
+        if args.target:
+            target = args.target
+        else:
+            target = None
         import eneel.logger as logger
         logger = logger.get_logger(project_name)
         import eneel.printer as printer
@@ -26,7 +31,7 @@ def main():
         printer.print_msg('')
         logger.debug("Loading project: " + project_name)
         try:
-            load_runner.run_project(project_name, connections_path=connections)
+            load_runner.run_project(project_name, connections_path=connections, target=target)
         except KeyboardInterrupt:
             print("Interupted by user")
 

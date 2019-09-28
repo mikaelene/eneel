@@ -9,34 +9,6 @@ import logging
 logger = logging.getLogger('main_logger')
 
 
-def get_connections(connections_path=None, target=None):
-    if not connections_path:
-        connections_path = os.path.join(os.path.expanduser('~'), '.eneel/connections.yml')
-    try:
-        connections_file_contents = utils.load_file_contents(connections_path, strip=False)
-        connections = utils.load_yaml(connections_file_contents)
-
-        connections_dict = {}
-        for conn in connections:
-            name = conn
-            type = connections[name]['type']
-            read_only = connections[name].get('read_only')
-            # If target is set from cli. Use tha ttarget. Else use from connections.yml
-            if target:
-                target_out = target
-            else:
-                target_out = connections[name]['target']
-
-            credentials = connections[name]['outputs'][target_out]
-            connection = {'name': conn, 'type': type, 'read_only': read_only, 'target': target_out,
-                          'credentials': credentials}
-
-            connections_dict[name] = connection
-        return connections_dict
-    except:
-        logger.error("Could not load connections.yml")
-
-
 def get_project(project):
     try:
         project_file_contents = utils.load_file_contents(project, strip=False)
@@ -86,7 +58,7 @@ class Connections:
 
         self.target = target
 
-        self.connections = get_connections(self._connections_path)
+        self.connections = self.get_connections()
 
     def __enter__(self):
         return self
@@ -101,12 +73,16 @@ class Connections:
                 name = conn
                 type = connections[name]['type']
                 read_only = connections[name].get('read_only')
+                # If target is set from cli. Use tha ttarget. Else use from connections.yml
+                if self.target:
+                    target_out = self.target
+                else:
+                    target_out = connections[name]['target']
 
-                if not self._target:
-                    self._target = connections[name]['target']
-                credentials = connections[name]['outputs'][self._target]
-                connection = {'name': conn, 'type': type, 'read_only': read_only, 'target': target,
+                credentials = connections[name]['outputs'][target_out]
+                connection = {'name': conn, 'type': type, 'read_only': read_only, 'target': target_out,
                               'credentials': credentials}
+
                 connections_dict[name] = connection
             return connections_dict
         except:
