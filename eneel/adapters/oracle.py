@@ -160,7 +160,7 @@ class Database:
             for col in columns[:-1]:
                 column_name = col[1]
                 select_stmt += "REPLACE(" + column_name + ",chr(0),'')" + " || '" + delimiter + "' || \n"
-            last_column_name = columns[-1:][0][1]
+            last_column_name = "REPLACE(" + columns[-1:][0][1] + ",chr(0),'')"
             select_stmt += last_column_name
             select_stmt += ' FROM ' + schema + "." + table
 
@@ -199,7 +199,7 @@ class Database:
             Set serveroutput off
             set heading off
             set arraysize 5000
-            SET LONG 100000
+            SET LONG 32767 
             spool """
 
             spool_cmd += file_path + '\n'
