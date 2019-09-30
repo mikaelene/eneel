@@ -188,7 +188,7 @@ class Database:
 
             # Add columns
             for col in columns:
-                column_name = col[1]
+                column_name = "[" + col[1] + "]"
                 select_stmt += column_name + ", "
             select_stmt = select_stmt[:-2]
 
@@ -304,7 +304,7 @@ class Database:
             for col in columns:
 
                 ordinal_position = col[0]
-                column_name = col[1]
+                column_name = "[" + col[1] + "]"
                 data_type = col[2].lower()
                 character_maximum_length = col[3]
                 numeric_precision = col[4]

@@ -10,20 +10,22 @@ logger = logging.getLogger('main_logger')
 
 
 def get_project(project):
-    try:
-        project_file_contents = utils.load_file_contents(project, strip=False)
-        project = utils.load_yaml(project_file_contents)
+    if project[-4:].lower() == '.yml':
+        try:
+            project_file_contents = utils.load_file_contents(project, strip=False)
+            project = utils.load_yaml(project_file_contents)
 
-        return project
-    except:
+            return project
+        except:
+            sys.exit("Failed loading project")
+    else:
         try:
             project_file_contents = utils.load_file_contents(project + '.yml', strip=False)
             project = utils.load_yaml(project_file_contents)
 
             return project
         except:
-            logger.error(project + ".yml not found")
-            sys.exit(-1)
+            sys.exit("Failed loading project")
 
 
 def connection_from_config(connection_info):
