@@ -1,18 +1,9 @@
 import os
-import sys
 import subprocess
 import shutil
 import yaml
-import eneel.adapters.postgres as postgres
-import eneel.adapters.oracle as oracle
-import eneel.adapters.sqlserver as sqlserver
 import logging
 logger = logging.getLogger('main_logger')
-
-
-def create_relative_path(path_name):
-    if not os.path.exists(path_name):
-        os.makedirs(path_name)
 
 
 def create_path(path_name):
@@ -31,20 +22,14 @@ def delete_path(path_name):
             shutil.rmtree(path_name)
         except:
             logger.debug("Could not delete directory")
-            pass
 
 
 def delete_file(file):
     if os.path.exists(file):
-        os.remove(file)
-
-
-def load_yaml_from_path(path):
-    with open(path, 'r') as stream:
         try:
-            return yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            logger.error(exc)
+            os.remove(file)
+        except:
+            logger.debug("Could not delete file")
 
 
 def load_yaml(stream):
@@ -56,7 +41,7 @@ def load_yaml(stream):
 
 def load_file_contents(path, strip=True):
     if not os.path.exists(path):
-        logger.error(path, ' not found')
+        logger.error(path + ' not found')
 
     with open(path, 'rb') as handle:
         to_return = handle.read().decode('utf-8')

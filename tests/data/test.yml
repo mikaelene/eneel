@@ -1,0 +1,2 @@
+schemas:
+      - source_schema: "public"               # You can replicate from multiple schemas
