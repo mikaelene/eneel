@@ -1,6 +1,4 @@
-import pytest
 from eneel.config import *
-from shutil import copyfile
 import os
 
 test_path = 'testpath'

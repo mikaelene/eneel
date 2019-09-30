@@ -1,4 +1,3 @@
-import pytest
 from eneel.utils import *
 import os
 

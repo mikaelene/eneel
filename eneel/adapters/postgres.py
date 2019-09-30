@@ -2,7 +2,6 @@ import os
 import sys
 import psycopg2
 import psycopg2.extras
-import eneel.printer as printer
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -125,17 +124,6 @@ class Database:
             return columns
         except:
             logger.error("Failed getting columns")
-
-    def create_table_script(self, table_name):
-        columns = self.table_columns(table_name)
-        statement = 'CREATE TABLE ' + table_name + '( '
-        for col in columns:
-            if col[2]:
-                statement = statement + col[0] + ' ' + col[1] + '(' + str(col[2]) + '), '
-            else:
-                statement = statement + col[0] + ' ' + col[1] + ', '
-        statement = statement[:-2] + ')'
-        return statement
 
     def check_table_exist(self, table_name):
         try:
