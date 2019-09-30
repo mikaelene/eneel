@@ -9,6 +9,10 @@ test_config_yml = 'test_connections.yml'
 test_project_yml = 'test_project.yml'
 
 
+def substitute_os_path_expanduser(_):
+    return test_data
+
+
 class TestGetProject:
 
     def test_get_project_from_path(self):
@@ -17,35 +21,51 @@ class TestGetProject:
         assert type(project_config) == dict
 
     def test_get_project(self):
-        project_config = get_project(test_project_yml)
+        project_yml = os.path.join(test_data, test_project_yml)[:-4]
+        project_config = get_project(project_yml)
         assert type(project_config) == dict
 
 
-def test_connection_from_config():
-    credentials = {'host': 'localhost', 'port': 5432, 'user': 'mikaelene', 'password': 'password-1234',
-                   'database': 'dvd2'}
-    connection_info = {'name': 'postgres1', 'type': 'postgres', 'read_only': False, 'target': 'prod',
-                          'credentials': credentials}
+class TestConnectionFromConfig:
 
-    connection = connection_from_config(connection_info)
+    def test_connection_from_config_postgres(self):
+        credentials = {'host': 'localhost', 'port': 5432, 'user': 'mikaelene', 'password': 'password-1234',
+                       'database': 'dvd2'}
+        connection_info = {'name': 'postgres1', 'type': 'postgres', 'read_only': False, 'target': 'prod',
+                              'credentials': credentials}
 
-    assert connection._dialect == 'postgres'
+        connection = connection_from_config(connection_info)
 
-
-def test_Connections():
-    connections_path = os.path.join(test_data, test_config_yml)
-    connections_path = os.path.abspath(connections_path)
-    connections = Connections(connections_path=connections_path)
-
-    assert connections.connections['postgres1']['type'] == 'postgres'
+        assert connection._dialect == 'postgres'
 
 
-def test_Connections_target():
-    connections_path = os.path.join(test_data, test_config_yml)
-    connections_path = os.path.abspath(connections_path)
-    connections = Connections(connections_path=connections_path, target='prod')
+class TestConnections:
 
-    assert connections.connections['postgres1']['type'] == 'postgres'
+    def test_Connections(self,monkeypatch):
+        monkeypatch.setattr(os.path, "expanduser", substitute_os_path_expanduser)
+        connections = Connections()
+
+        assert connections.connections['postgres1']['type'] == 'postgres'
+
+    def test_Connections_target(self, monkeypatch):
+        monkeypatch.setattr(os.path, "expanduser", substitute_os_path_expanduser)
+        connections = Connections(target='prod')
+
+        assert connections.connections['postgres1']['type'] == 'postgres'
+
+    def test_Connections_from_path(self):
+        connections_path = os.path.join(test_data, test_config_yml)
+        connections_path = os.path.abspath(connections_path)
+        connections = Connections(connections_path=connections_path)
+
+        assert connections.connections['postgres1']['type'] == 'postgres'
+
+    def test_Connections_from_path_target(self):
+        connections_path = os.path.join(test_data, test_config_yml)
+        connections_path = os.path.abspath(connections_path)
+        connections = Connections(connections_path=connections_path, target='prod')
+
+        assert connections.connections['postgres1']['type'] == 'postgres'
 
 
 def test_Project():
