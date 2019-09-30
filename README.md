@@ -43,6 +43,11 @@ Go to the directory with the project configuration file and run eneel with the p
 The output will then be something like below for at successfull run:
 ![alt text](etc/output.png)
 
+Optional parameters:
+- `--connections`: add a path to the connections.yml you would like to use
+- `--target`: specify which target in connections.yml you would like to use. This will be applied on both sources and targets
+
+
 ## Feature matrix
 Database | Source | Target
 --- | :---: | :---: |
