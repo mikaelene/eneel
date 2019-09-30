@@ -7,6 +7,7 @@ test_yml_path = './tests/data/test.yml'
 test_yml = """schemas:
       - source_schema: "public"               # You can replicate from multiple schemas"""
 
+
 def test_create_path(tmp_path):
     path = tmp_path / test_path
     created_rel_path = create_path(path)

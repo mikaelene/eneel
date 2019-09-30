@@ -9,10 +9,16 @@ test_config_yml = 'test_connections.yml'
 test_project_yml = 'test_project.yml'
 
 
-def test_get_project():
-    project_yml = os.path.join(test_data, test_project_yml)
-    project_config = get_project(project_yml)
-    assert type(project_config) == dict
+class TestGetProject:
+
+    def test_get_project_from_path(self):
+        project_yml = os.path.join(test_data, test_project_yml)
+        project_config = get_project(project_yml)
+        assert type(project_config) == dict
+
+    def test_get_project(self):
+        project_config = get_project(test_project_yml)
+        assert type(project_config) == dict
 
 
 def test_connection_from_config():
@@ -50,3 +56,4 @@ def test_Project():
     project = Project(project_yml, connections.connections)
 
     assert project.source_name == 'postgres1'
+

@@ -41,7 +41,7 @@ def load_yaml(stream):
 
 def load_file_contents(path, strip=True):
     if not os.path.exists(path):
-        logger.error(path, ' not found')
+        logger.debug(path + ' not found')
 
     with open(path, 'rb') as handle:
         to_return = handle.read().decode('utf-8')
