@@ -188,8 +188,11 @@ def run_load(project_load):
             if replication_key not in [column[1] for column in columns]:
                 printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication key not found in table")
                 return return_code
-
-            max_replication_key = target.get_max_column_value(full_target_table, replication_key)
+            if target.check_table_exist(full_target_table):
+                max_replication_key = target.get_max_column_value(full_target_table, replication_key)
+            else:
+                max_replication_key = None
+                logger.debug(full_target_table + ' does not exist. Starts FULL_TABLE load')
             if not max_replication_key:
                 # Full export
                 file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
