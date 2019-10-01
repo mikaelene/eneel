@@ -2,6 +2,7 @@ import os
 import sys
 import psycopg2
 import psycopg2.extras
+import eneel.printer as printer
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -331,49 +332,3 @@ class Database:
             logger.debug("table created")
         except:
             logger.error("Failed create table from columns")
-
-    def create_log_table(self, schema, table):
-        if self._read_only:
-            sys.exit("This source is readonly. Terminating load run")
-
-        full_table = schema + '.' + table
-
-        if self.check_table_exist(full_table):
-            logger.debug('Log table exist')
-            return
-
-        ddl = """create table eneel.run_log(
-        project	varchar(128),
-        project_started_at	timestamp,
-        source_table	varchar(128),
-        target_table	varchar(128),
-        started_at	timestamp,
-        ended_at	timestamp,
-        status		varchar(128),
-        exported_rows	int,
-        imported_rows	int
-        );"""
-
-        self.create_schema(schema)
-        self.execute(ddl)
-        logger.debug(full_table + ' created')
-
-    def log(self, schema, table,
-            project=None,
-            project_started_at=None,
-            source_table=None,
-            target_table=None,
-            started_at=None,
-            ended_at=None,
-            status=None,
-            exported_rows=None,
-            imported_rows=None):
-
-        full_table = schema + '.' + table
-        row = [project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows]
-
-        sql = 'INSERT INTO ' + full_table
-        sql += ' (project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows)'
-        sql += ' VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)'
-
-        self.execute(sql, row)

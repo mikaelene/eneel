@@ -3,7 +3,6 @@ from concurrent.futures import ProcessPoolExecutor as Executor
 import os
 import eneel.printer as printer
 import time
-import datetime
 import eneel.config as config
 
 import logging
@@ -31,16 +30,6 @@ def run_project(project_name, connections_path=None, target=None):
     printer.print_output_line(start_msg)
 
     job_start_time = time.time()
-    project_started_at = datetime.datetime.fromtimestamp(job_start_time)
-
-    if project.logdb_conninfo:
-        logdb = config.connection_from_config(project.logdb_conninfo)
-        logdb.create_log_table('eneel', 'run_log')
-        logdb.log('eneel', 'run_log', project=project_name, project_started_at=project_started_at, status='START')
-        for load in project.loads:
-            load.update({"project_started_at": project_started_at})
-
-    print(project.loads)
 
     # Execute parallel load
     load_results = []
@@ -64,10 +53,7 @@ def run_project(project_name, connections_path=None, target=None):
     if not project.keep_tempfiles:
         utils.delete_path(project.temp_path)
 
-    job_end_time = time.time()
-    project_ended_at = datetime.datetime.fromtimestamp(job_end_time)
-
-    execution_time = job_end_time - job_start_time
+    execution_time = time.time() - job_start_time
 
     status_time = " in {execution_time:0.2f}s".format(
         execution_time=execution_time)
@@ -87,13 +73,6 @@ def run_project(project_name, connections_path=None, target=None):
     else:
         printer.print_msg("Completed successfully", "green")
 
-    # Close connections
-    if project.logdb_conninfo:
-        logdb.create_log_table('eneel', 'run_log')
-        logdb.log('eneel', 'run_log', project_started_at=project_started_at, project=project_name, ended_at=project_ended_at, status='DONE')
-
-        logdb.close()
-
 
 def run_load(project_load):
     load_order = project_load.get('load_order')
@@ -101,8 +80,6 @@ def run_load(project_load):
     project_name = project_load.get('project_name')
     source_conninfo = project_load.get('source_conninfo')
     target_conninfo = project_load.get('target_conninfo')
-    logdb_conninfo = project_load.get('logdb_conninfo')
-    project_started_at = project_load.get('project_started_at')
     project = project_load.get('project')
     temp_path = project_load.get('temp_path')
     schema = project_load.get('schema')
@@ -136,11 +113,6 @@ def run_load(project_load):
     full_target_table = target_schema + '.' + target_table
     index = load_order
     total = num_tables_to_load
-
-    if logdb_conninfo:
-        logdb = config.connection_from_config(logdb_conninfo)
-        logdb.create_log_table('eneel', 'run_log')
-        logdb.log('eneel', 'run_log', project=project_name, project_started_at=project_started_at, status='LOAD')
 
     if not source.check_table_exist(full_source_table):
         printer.print_load_line(index, total, "ERROR", full_source_table, msg="does not exist in source")
