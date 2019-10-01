@@ -144,7 +144,7 @@ def run_load(project_load):
 
     if not source.check_table_exist(full_source_table):
         printer.print_load_line(index, total, "ERROR", full_source_table, msg="does not exist in source")
-        return return_code
+        return return_code 
 
     # Temp table
     target_table_tmp = target_table + '_tmp'
