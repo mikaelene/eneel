@@ -159,18 +159,28 @@ def run_load(project_load):
         try:
             file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
                                               csv_delimiter)
-
+        except:
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
+            return return_code
+        try:
             # Create temp table
             target.create_table_from_columns(target_schema, target_table_tmp, columns)
+        except:
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
+            return return_code
 
+        try:
             # Import into temp table
             return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+        except:
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed import into temptable")
+            return return_code
 
+        try:
             # Switch tables
             target.switch_tables(target_schema, target_table, target_table_tmp)
-
         except:
-            printer.print_load_line(index, total, "ERROR", full_source_table, msg="load ")
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed switching temptable")
             return return_code
 
     elif replication_method == "INCREMENTAL":
@@ -185,32 +195,83 @@ def run_load(project_load):
             if not replication_key:
                 printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication key not defined")
                 return return_code
+
             if replication_key not in [column[1] for column in columns]:
                 printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication key not found in table")
                 return return_code
 
-            max_replication_key = target.get_max_column_value(full_target_table, replication_key)
+            if target.check_table_exist(full_target_table):
+                max_replication_key = target.get_max_column_value(full_target_table, replication_key)
+            else:
+                max_replication_key = None
+                printer.print_load_line(index, total, return_code, full_target_table,
+                                        msg="does not exist in target. Starts FULL_TABLE load")
+
             if not max_replication_key:
-                # Full export
-                file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
-                                                      csv_delimiter)
-                # Create temp table
-                target.create_table_from_columns(target_schema, target_table_tmp, columns)
-                # Import into temp table
-                return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
-                # Switch tables
-                target.switch_tables(target_schema, target_table, target_table_tmp)
+                # Export table
+                try:
+                    file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
+                                                          csv_delimiter)
+                except:
+                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
+                    return return_code
+                try:
+                    # Create temp table
+                    target.create_table_from_columns(target_schema, target_table_tmp, columns)
+                except:
+                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
+                    return return_code
+
+                try:
+                    # Import into temp table
+                    return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file,
+                                                                        delimiter)
+                except:
+                    printer.print_load_line(index, total, "ERROR", full_source_table,
+                                            msg="failed import into temptable")
+                    return return_code
+
+                try:
+                    # Switch tables
+                    target.switch_tables(target_schema, target_table, target_table_tmp)
+                except:
+                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed switching temptable")
+                    return return_code
 
             else:
-                # Export new rows
-                file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load, csv_delimiter,
-                                                      replication_key, max_replication_key)
-                # Create temp table
-                target.create_table_from_columns(target_schema, target_table_tmp, columns)
-                # Import into temp table
-                return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
-                # Insert into and drop
-                target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
+                try:
+                    # Export new rows
+                    file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load, csv_delimiter,
+                                                          replication_key, max_replication_key)
+                except:
+                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
+                    return return_code
+
+                try:
+                    # Create temp table
+                    target.create_table_from_columns(target_schema, target_table_tmp, columns)
+                except:
+                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
+                    return return_code
+
+                try:
+                    # Import into temp table
+                    return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file,
+                                                                        delimiter)
+                except:
+                    printer.print_load_line(index, total, "ERROR", full_source_table,
+                                            msg="failed import into temptable")
+                    return return_code
+
+                try:
+                    # Insert into and drop
+                    target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
+
+                except:
+                    printer.print_load_line(index, total, "ERROR", full_source_table,
+                                            msg="failed import from temptable")
+                    return return_code
+
 
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="load failed")
