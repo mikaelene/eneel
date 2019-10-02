@@ -51,6 +51,7 @@ def run_project(project_name, connections_path=None, target=None):
             project.logdb = None
             for load in project.loads:
                 load['logdbs'] = None
+    job_start_time = time.time()
 
     # Execute parallel load
     load_results = []
@@ -76,9 +77,7 @@ def run_project(project_name, connections_path=None, target=None):
 
     job_end_time = time()
     project_ended_at = datetime.fromtimestamp(job_end_time)
-
     execution_time = job_end_time - job_start_time
-
     status_time = " in {execution_time:0.2f}s".format(
         execution_time=execution_time)
 
