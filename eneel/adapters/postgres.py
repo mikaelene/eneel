@@ -177,6 +177,7 @@ class Database:
             select_stmt = "SELECT "
 
             # Add columns
+            print(columns)
             for col in columns:
                 column_name = col[1]
                 select_stmt += column_name + ", "
