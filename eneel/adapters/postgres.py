@@ -2,6 +2,8 @@ import os
 import sys
 import psycopg2
 import psycopg2.extras
+from time import time
+from datetime import datetime
 
 import logging
 logger = logging.getLogger('main_logger')
