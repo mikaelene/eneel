@@ -387,28 +387,67 @@ class Database:
 
         full_table = schema + '.' + table
 
-        if self.check_table_exist(full_table):
+        if not self.check_table_exist(full_table):
             logger.debug('Log table exist')
-            return
+            ddl = 'create table '
+            ddl += full_table
+            ddl += """(
+            log_time    datetime2(6),
+            project	varchar(128),
+            project_started_at	datetime2(6),
+            source_table	varchar(128),
+            target_table	varchar(128),
+            started_at	datetime2(6),
+            ended_at	datetime2(6),
+            status		varchar(128),
+            exported_rows	int,
+            imported_rows	int
+            );"""
 
-        ddl = 'create table '
-        ddl += full_table
-        ddl += """(
-        log_time    datetime2(6),
-        project	varchar(128),
-        project_started_at	datetime2(6),
-        source_table	varchar(128),
-        target_table	varchar(128),
-        started_at	datetime2(6),
-        ended_at	datetime2(6),
-        status		varchar(128),
-        exported_rows	int,
-        imported_rows	int
-        );"""
+            self.create_schema(schema)
+            self.execute(ddl)
+            logger.debug(full_table + ' created')
 
-        self.create_schema(schema)
-        self.execute(ddl)
-        logger.debug(full_table + ' created')
+        view1_ddl = 'create or alter view '
+        view1_ddl += full_table + '_summary as '
+        view1_ddl += """select
+CONVERT(varchar(10),project_started_at,120) as project_started_date, 
+project_started_at, 
+project, 
+case max( CASE "status"  WHEN 'end' THEN 1 ELSE 0 END ) when 1 then 'Finished' else 'Running or failed' end as status,
+case max( CASE "status"  WHEN 'end' THEN 1 ELSE 0 END ) when 1 then max(ended_at) end as ended_at,
+CONVERT(varchar, dateadd(ms,datediff(ms , min(project_started_at), max(ended_at)),0), 108) as duration,
+sum(exported_rows) as exported_rows,
+sum(imported_rows) as imported_rows,
+sum(imported_rows) / datediff(second , min(project_started_at), max(ended_at)) as loaded_rows_per_sec
+from  """
+        view1_ddl += full_table
+        view1_ddl += """
+group BY
+CONVERT(varchar(10),project_started_at,120), 
+project_started_at, 
+project"""
+        self.execute(view1_ddl)
+
+        view2_ddl = 'create or alter view '
+        view2_ddl += full_table + '_details as '
+        view2_ddl += """select
+CONVERT(varchar(10),project_started_at,120) as project_started_date, 
+project_started_at, 
+project,
+source_table,
+target_table,
+CONVERT(varchar(19), started_at, 120) as started_at,
+CONVERT(varchar(19), ended_at, 120) as ended_at,
+CONVERT(varchar, dateadd(ms,datediff(ms , started_at, ended_at),0), 108) as duration,
+status, 
+exported_rows as exported_rows,
+imported_rows as imported_rows,
+imported_rows / datediff(second , started_at, ended_at) as loaded_rows_per_sec
+from  """
+        view2_ddl += full_table
+        view2_ddl += ' where source_table is not null'
+        self.execute(view2_ddl)
 
     def log(self, schema, table,
             project=None,
