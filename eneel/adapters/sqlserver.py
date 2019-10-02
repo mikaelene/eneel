@@ -2,6 +2,9 @@ import os
 import sys
 import pyodbc
 import eneel.utils as utils
+from time import time
+from datetime import datetime
+
 import logging
 logger = logging.getLogger('main_logger')
 
@@ -228,7 +231,7 @@ class Database:
             else:
                 logger.error("Error exportng " + schema + '.' + table + " :" + cmd_message)
 
-            return file_path, delimiter
+            return file_path, delimiter, num_rows
         except:
             logger.error("Failed exporting table")
 
@@ -378,3 +381,52 @@ class Database:
         except:
             logger.error("Failed create table from columns")
 
+    def create_log_table(self, schema, table):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
+
+        full_table = schema + '.' + table
+
+        if self.check_table_exist(full_table):
+            logger.debug('Log table exist')
+            return
+
+        ddl = 'create table '
+        ddl += full_table
+        ddl += """(
+        log_time    datetime2(6),
+        project	varchar(128),
+        project_started_at	datetime2(6),
+        source_table	varchar(128),
+        target_table	varchar(128),
+        started_at	datetime2(6),
+        ended_at	datetime2(6),
+        status		varchar(128),
+        exported_rows	int,
+        imported_rows	int
+        );"""
+
+        self.create_schema(schema)
+        self.execute(ddl)
+        logger.debug(full_table + ' created')
+
+    def log(self, schema, table,
+            project=None,
+            project_started_at=None,
+            source_table=None,
+            target_table=None,
+            started_at=None,
+            ended_at=None,
+            status=None,
+            exported_rows=None,
+            imported_rows=None):
+
+        full_table = schema + '.' + table
+        log_time = datetime.fromtimestamp(time())
+        row = [log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows]
+
+        sql = 'INSERT INTO ' + full_table
+        sql += ' (log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows)'
+        sql += ' VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+
+        self.execute(sql, row)
