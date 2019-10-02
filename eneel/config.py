@@ -107,9 +107,12 @@ class Project:
         self.target_conninfo = connections[self.target_name]
 
         if self.logdb_name:
-            self.logdb_conninfo = connections[self.logdb_name]
+            logdb_conninfo = connections.get(self.logdb_name)
+            logdb_schema = self.project_config.get('logschema', 'eneel')
+            logdb_table = self.project_config.get('logtable', 'run_log')
+            self.logdb = {'conninfo': logdb_conninfo, 'schema': logdb_schema, 'table': logdb_table}
         else:
-            self.logdb_conninfo = None
+            self.logdb = None
 
         self.project = self.project_config.copy()
         del self.project['schemas']
@@ -133,7 +136,7 @@ class Project:
         project_names = []
         source_conninfos = []
         target_conninfos = []
-        logdb_conninfos = []
+        logdbs = []
         projects = []
         schemas = []
         tables = []
@@ -147,7 +150,7 @@ class Project:
             for table in schema_config['tables']:
                 source_conninfo_item = self.source_conninfo
                 target_conninfo_item = self.target_conninfo
-                logdb_conninfo_item = self.logdb_conninfo
+                logdb_item = self.logdb
                 project_item = self.project
                 schema_item = schema
                 table_item = table
@@ -157,7 +160,7 @@ class Project:
                 project_names.append(self.project_name)
                 source_conninfos.append(source_conninfo_item)
                 target_conninfos.append(target_conninfo_item)
-                logdb_conninfos.append(logdb_conninfo_item)
+                logdbs.append(logdb_item)
                 projects.append(project_item)
                 schemas.append(schema_item)
                 tables.append(table_item)
@@ -175,7 +178,7 @@ class Project:
                   'project_name': project_name,
                   'source_conninfo': source_conninfo,
                   'target_conninfo': target_conninfo,
-                  'logdb_conninfo': logdb_conninfo,
+                  'logdb': logdb,
                   'project': project,
                   'schema': schema,
                   'table': table,
@@ -186,7 +189,7 @@ class Project:
                      project_name,
                      source_conninfo,
                      target_conninfo,
-                     logdb_conninfo,
+                     logdb,
                      project,
                      schema,
                      table,
@@ -195,7 +198,7 @@ class Project:
                                       project_names,
                                       source_conninfos,
                                       target_conninfos,
-                                      logdb_conninfos,
+                                      logdbs,
                                       projects,
                                       schemas,
                                       tables,

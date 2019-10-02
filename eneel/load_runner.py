@@ -33,13 +33,22 @@ def run_project(project_name, connections_path=None, target=None):
     job_start_time = time.time()
     project_started_at = datetime.datetime.fromtimestamp(job_start_time)
 
-    if project.logdb_conninfo:
-        logdb = config.connection_from_config(project.logdb_conninfo)
-        logdb.create_log_table('eneel', 'run_log')
-        logdb.log('eneel', 'run_log', project=project_name.lower(), project_started_at=project_started_at, started_at=project_started_at, status='START')
-        for load in project.loads:
-            load.update({"project_started_at": project_started_at})
-
+    if project.logdb:
+        try:
+            logdb = config.connection_from_config(project.logdb['conninfo'])
+            logdb.create_log_table(project.logdb['schema'], project.logdb['table'])
+            logdb.log(project.logdb['schema'], project.logdb['table'],
+                      project=project_name.lower(),
+                      project_started_at=project_started_at,
+                      started_at=project_started_at,
+                      status='START')
+            for load in project.loads:
+                load.update({"project_started_at": project_started_at})
+        except:
+            logger.debug('Failed creating database logger')
+            project.logdb = None
+            for load in project.loads:
+                load['logdbs'] = None
 
     # Execute parallel load
     load_results = []
@@ -87,9 +96,12 @@ def run_project(project_name, connections_path=None, target=None):
         printer.print_msg("Completed successfully", "green")
 
     # Close connections
-    if project.logdb_conninfo:
-        logdb.create_log_table('eneel', 'run_log')
-        logdb.log('eneel', 'run_log', project_started_at=project_started_at, project=project_name, ended_at=project_ended_at, status='END')
+    if project.logdb:
+        logdb.log(project.logdb['schema'], project.logdb['table'],
+                  project_started_at=project_started_at,
+                  project=project_name,
+                  ended_at=project_ended_at,
+                  status='END')
 
         logdb.close()
 
@@ -100,7 +112,9 @@ def run_load(project_load):
     project_name = project_load.get('project_name')
     source_conninfo = project_load.get('source_conninfo')
     target_conninfo = project_load.get('target_conninfo')
-    logdb_conninfo = project_load.get('logdb_conninfo')
+    logdb_conninfo = project_load.get('logdb')['conninfo']
+    logdb_schema = project_load.get('logdb')['schema']
+    logdb_table = project_load.get('logdb')['table']
     project_started_at = project_load.get('project_started_at')
     project = project_load.get('project')
     temp_path = project_load.get('temp_path')
@@ -321,7 +335,7 @@ def run_load(project_load):
 
         load_started_at = datetime.datetime.fromtimestamp(load_start_time)
         load_ended_at = datetime.datetime.fromtimestamp(end_time)
-        logdb.log('eneel', 'run_log',
+        logdb.log(logdb_schema, logdb_table,
                   project=project_name,
                   project_started_at=project_started_at,
                   source_table=full_source_table,
