@@ -383,3 +383,4 @@ class Database:
         sql += ' VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
 
         self.execute(sql, row)
+
