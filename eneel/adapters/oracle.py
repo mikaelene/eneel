@@ -230,7 +230,7 @@ class Database:
             else:
                 logger.error("Error exportng " + schema + '.' + table + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
 
-            return file_path, delimiter
+            return file_path, delimiter, None
         except:
             logger.error("Failed exporting table")
 

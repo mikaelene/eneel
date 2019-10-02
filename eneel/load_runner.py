@@ -2,7 +2,8 @@ import eneel.utils as utils
 from concurrent.futures import ProcessPoolExecutor as Executor
 import os
 import eneel.printer as printer
-import time
+from time import time
+from datetime import datetime
 import eneel.config as config
 
 import logging
@@ -10,6 +11,8 @@ logger = logging.getLogger('main_logger')
 
 
 def run_project(project_name, connections_path=None, target=None):
+
+    project_name = project_name.lower()
     # Connections
     connections = config.Connections(connections_path, target)
 
@@ -29,7 +32,25 @@ def run_project(project_name, connections_path=None, target=None):
     start_msg = "Start loading " + str(project.num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
     printer.print_output_line(start_msg)
 
-    job_start_time = time.time()
+    job_start_time = time()
+    project_started_at = datetime.fromtimestamp(job_start_time)
+
+    if project.logdb:
+        try:
+            logdb = config.connection_from_config(project.logdb['conninfo'])
+            logdb.create_log_table(project.logdb['schema'], project.logdb['table'])
+            logdb.log(project.logdb['schema'], project.logdb['table'],
+                      project=project_name,
+                      project_started_at=project_started_at,
+                      started_at=project_started_at,
+                      status='START')
+            for load in project.loads:
+                load.update({"project_started_at": project_started_at})
+        except:
+            logger.debug('Failed creating database logger')
+            project.logdb = None
+            for load in project.loads:
+                load['logdbs'] = None
 
     # Execute parallel load
     load_results = []
@@ -53,8 +74,9 @@ def run_project(project_name, connections_path=None, target=None):
     if not project.keep_tempfiles:
         utils.delete_path(project.temp_path)
 
-    execution_time = time.time() - job_start_time
-
+    job_end_time = time()
+    project_ended_at = datetime.fromtimestamp(job_end_time)
+    execution_time = job_end_time - job_start_time
     status_time = " in {execution_time:0.2f}s".format(
         execution_time=execution_time)
 
@@ -73,6 +95,16 @@ def run_project(project_name, connections_path=None, target=None):
     else:
         printer.print_msg("Completed successfully", "green")
 
+    # Close connections
+    if project.logdb:
+        logdb.log(project.logdb['schema'], project.logdb['table'],
+                  project_started_at=project_started_at,
+                  project=project_name,
+                  ended_at=project_ended_at,
+                  status='END')
+
+        logdb.close()
+
 
 def run_load(project_load):
     load_order = project_load.get('load_order')
@@ -80,6 +112,10 @@ def run_load(project_load):
     project_name = project_load.get('project_name')
     source_conninfo = project_load.get('source_conninfo')
     target_conninfo = project_load.get('target_conninfo')
+    logdb_conninfo = project_load.get('logdb')['conninfo']
+    logdb_schema = project_load.get('logdb')['schema']
+    logdb_table = project_load.get('logdb')['table']
+    project_started_at = project_load.get('project_started_at')
     project = project_load.get('project')
     temp_path = project_load.get('temp_path')
     schema = project_load.get('schema')
@@ -87,7 +123,7 @@ def run_load(project_load):
 
     return_code = 'ERROR'
 
-    load_start_time = time.time()
+    load_start_time = time()
 
     import eneel.logger as logger
     logger = logger.get_logger(project_name)
@@ -157,7 +193,7 @@ def run_load(project_load):
 
         # Export table
         try:
-            file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
+            file, delimiter, export_row_count = source.export_table(source_schema, source_table, columns, temp_path_load,
                                               csv_delimiter)
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
@@ -210,7 +246,7 @@ def run_load(project_load):
             if not max_replication_key:
                 # Export table
                 try:
-                    file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load,
+                    file, delimiter, export_row_count = source.export_table(source_schema, source_table, columns, temp_path_load,
                                                           csv_delimiter)
                 except:
                     printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
@@ -241,7 +277,7 @@ def run_load(project_load):
             else:
                 try:
                     # Export new rows
-                    file, delimiter = source.export_table(source_schema, source_table, columns, temp_path_load, csv_delimiter,
+                    file, delimiter, export_row_count = source.export_table(source_schema, source_table, columns, temp_path_load, csv_delimiter,
                                                           replication_key, max_replication_key)
                 except:
                     printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
@@ -289,9 +325,26 @@ def run_load(project_load):
     source.close()
     target.close()
 
-    rows = import_row_count
-    execution_time = time.time() - load_start_time
-    printer.print_load_line(index, total, return_code, full_source_table, rows, execution_time)
+    end_time = time()
+    execution_time = end_time - load_start_time
+
+    printer.print_load_line(index, total, return_code, full_source_table, import_row_count, execution_time)
+
+    if logdb_conninfo:
+        logdb = config.connection_from_config(logdb_conninfo)
+
+        load_started_at = datetime.fromtimestamp(load_start_time)
+        load_ended_at = datetime.fromtimestamp(end_time)
+        logdb.log(logdb_schema, logdb_table,
+                  project=project_name,
+                  project_started_at=project_started_at,
+                  source_table=full_source_table,
+                  target_table=full_target_table,
+                  started_at=load_started_at,
+                  ended_at=load_ended_at,
+                  status=return_code,
+                  exported_rows=export_row_count,
+                  imported_rows=import_row_count)
 
     return return_code
 
