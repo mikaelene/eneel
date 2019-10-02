@@ -218,7 +218,7 @@ class Database:
 
             logger.debug(str(row_count) + " records exported")
 
-            return file_path, delimiter
+            return file_path, delimiter, row_count
         except:
             logger.error("Failed exporting table")
 
