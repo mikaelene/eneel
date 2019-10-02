@@ -2,8 +2,8 @@ import eneel.utils as utils
 from concurrent.futures import ProcessPoolExecutor as Executor
 import os
 import eneel.printer as printer
-import time
-import datetime
+from time import time
+from datetime import datetime
 import eneel.config as config
 
 import logging
@@ -11,6 +11,8 @@ logger = logging.getLogger('main_logger')
 
 
 def run_project(project_name, connections_path=None, target=None):
+
+    project_name = project_name.lower()
     # Connections
     connections = config.Connections(connections_path, target)
 
@@ -30,15 +32,15 @@ def run_project(project_name, connections_path=None, target=None):
     start_msg = "Start loading " + str(project.num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
     printer.print_output_line(start_msg)
 
-    job_start_time = time.time()
-    project_started_at = datetime.datetime.fromtimestamp(job_start_time)
+    job_start_time = time()
+    project_started_at = datetime.fromtimestamp(job_start_time)
 
     if project.logdb:
         try:
             logdb = config.connection_from_config(project.logdb['conninfo'])
             logdb.create_log_table(project.logdb['schema'], project.logdb['table'])
             logdb.log(project.logdb['schema'], project.logdb['table'],
-                      project=project_name.lower(),
+                      project=project_name,
                       project_started_at=project_started_at,
                       started_at=project_started_at,
                       status='START')
@@ -72,8 +74,8 @@ def run_project(project_name, connections_path=None, target=None):
     if not project.keep_tempfiles:
         utils.delete_path(project.temp_path)
 
-    job_end_time = time.time()
-    project_ended_at = datetime.datetime.fromtimestamp(job_end_time)
+    job_end_time = time()
+    project_ended_at = datetime.fromtimestamp(job_end_time)
 
     execution_time = job_end_time - job_start_time
 
@@ -123,7 +125,7 @@ def run_load(project_load):
 
     return_code = 'ERROR'
 
-    load_start_time = time.time()
+    load_start_time = time()
 
     import eneel.logger as logger
     logger = logger.get_logger(project_name)
@@ -325,7 +327,7 @@ def run_load(project_load):
     source.close()
     target.close()
 
-    end_time = time.time()
+    end_time = time()
     execution_time = end_time - load_start_time
 
     printer.print_load_line(index, total, return_code, full_source_table, import_row_count, execution_time)
@@ -333,8 +335,8 @@ def run_load(project_load):
     if logdb_conninfo:
         logdb = config.connection_from_config(logdb_conninfo)
 
-        load_started_at = datetime.datetime.fromtimestamp(load_start_time)
-        load_ended_at = datetime.datetime.fromtimestamp(end_time)
+        load_started_at = datetime.fromtimestamp(load_start_time)
+        load_ended_at = datetime.fromtimestamp(end_time)
         logdb.log(logdb_schema, logdb_table,
                   project=project_name,
                   project_started_at=project_started_at,

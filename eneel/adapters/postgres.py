@@ -342,7 +342,10 @@ class Database:
             logger.debug('Log table exist')
             return
 
-        ddl = """create table eneel.run_log(
+        ddl = 'create table '
+        ddl += full_table
+        ddl += """(
+        log_time    timestamp,
         project	varchar(128),
         project_started_at	timestamp,
         source_table	varchar(128),
@@ -370,10 +373,11 @@ class Database:
             imported_rows=None):
 
         full_table = schema + '.' + table
-        row = [project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows]
+        log_time = datetime.fromtimestamp(time())
+        row = [log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows]
 
         sql = 'INSERT INTO ' + full_table
-        sql += ' (project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows)'
-        sql += ' VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)'
+        sql += ' (log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows)'
+        sql += ' VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
 
         self.execute(sql, row)
