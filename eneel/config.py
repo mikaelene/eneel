@@ -101,6 +101,7 @@ class Project:
 
         self.source_name = self.project_config['source']
         self.target_name = self.project_config['target']
+        self.logdb_name = self.project_config.get('logdb')
 
         self.source_conninfo = connections[self.source_name]
         self.target_conninfo = connections[self.target_name]
