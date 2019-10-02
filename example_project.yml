@@ -6,8 +6,13 @@ temp_path: /tempfiles                     # The directory to use for temp csv fi
 csv_delimiter: "|"                        # The delimiter to use in the csv files (OPTIONAL: default=| )
 
 # Connection details
-source: postgres1                         # A Connection name in connections.yml
-target: sqlserver1                        # A Connection name in connections.yml
+source: postgres1                         # A Connection name in connections.yml, that you want to load data from
+target: sqlserver1                        # A Connection name in connections.yml, that you want to load data from
+
+# Database logging
+logdb: postgres1                          # A Connection name in connections.yml, that you want to log to
+logschema: my_log_schema                  # Schema to create log table (OPTIONAL: default=eneel )
+logtable: my_run_log                      # Table to log in (OPTIONAL: default=run_log )
 
 # Source to Destination Schema mapping
 schemas:
