@@ -33,6 +33,7 @@ def connection_from_config(connection_info):
     user = connection_info['credentials'].get('user')
     password = connection_info['credentials'].get('password')
     server = connection_info['credentials'].get('host')
+    port = connection_info['credentials'].get('port')
     limit_rows = connection_info.get('credentials').get('limit_rows')
     table_where_clause = connection_info.get('credentials').get('table_where_clause')
     read_only = connection_info.get('read_only')
@@ -47,7 +48,7 @@ def connection_from_config(connection_info):
         return sqlserver.Database(odbc_driver, server, database, limit_rows, user, password, trusted_connection,
                                   as_columnstore, read_only)
     elif connection_info.get('type') == 'postgres':
-        return postgres.Database(server, user, password, database, limit_rows, read_only)
+        return postgres.Database(server, user, password, database, port, limit_rows, read_only)
     else:
         logger.error('source type not found')
 

@@ -29,39 +29,6 @@ def get_timestamp():
     return time.strftime("%H:%M:%S")
 
 
-def print_fancy_output_line(msg, status, index, total, execution_time=None,
-                            truncate=False):
-    if index is None or total is None:
-        progress = ''
-    else:
-        progress = '{} of {} '.format(index, total)
-    prefix = "{timestamp} | {progress}{message}".format(
-        timestamp=get_timestamp(),
-        progress=progress,
-        message=msg)
-
-    truncate_width = PRINTER_WIDTH - 3
-    justified = prefix.ljust(PRINTER_WIDTH, ".")
-    if truncate and len(justified) > truncate_width:
-        justified = justified[:truncate_width] + '...'
-
-    if execution_time is None:
-        status_time = ""
-    else:
-        status_time = " in {execution_time:0.2f}s".format(
-            execution_time=execution_time)
-
-    if status == "OK":
-        status = COLOR_FG_GREEN + status + COLOR_RESET_ALL
-
-    status_txt = status
-
-    output = "{justified} [{status}{status_time}]".format(
-        justified=justified, status=status_txt, status_time=status_time)
-
-    logger.info(output)
-
-
 def print_output_line(msg):
     output = "{timestamp} | {message}".format(
         timestamp=get_timestamp(),
