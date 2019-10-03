@@ -10,7 +10,7 @@ logger = logging.getLogger('main_logger')
 
 
 class Database:
-    def __init__(self, server, user, password, database, limit_rows=None, read_only=False):
+    def __init__(self, server, user, password, database, port=5432, limit_rows=None, read_only=False):
         try:
             conn_string = "host=" + server + " dbname=" + \
                           database + " user=" + user + " password=" + password
@@ -18,6 +18,7 @@ class Database:
             self._user = user
             self._password = password
             self._database = database
+            self._port = port
             self._dialect = "postgres"
             self._limit_rows = limit_rows
             self._read_only = read_only
