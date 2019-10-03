@@ -10,11 +10,11 @@ logger = logging.getLogger('main_logger')
 
 
 class Database:
-    def __init__(self, driver, server, database, limit_rows=None, user=None, password=None,
+    def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
                  trusted_connection=None, as_columnstore=False, read_only=False):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
-                          database
+                          database + ";PORT=" + port
             if trusted_connection:
                 conn_string += ";trusted_connection=yes"
             else:
@@ -23,6 +23,7 @@ class Database:
             self._user = user
             self._password = password
             self._database = database
+            self._port = port
             self._dialect = "sqlserver"
             self._limit_rows = limit_rows
             self._as_columnstore = as_columnstore
