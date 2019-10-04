@@ -226,17 +226,17 @@ class Database:
             if cmd_code == 0:
                 try:
                     return_message = cmd_message.splitlines()
-                    num_rows = str(return_message[-3].split()[0])
+                    row_count = int(return_message[-3].split()[0])
                     timing = str(return_message[-1].split()[5])
                     average = str(return_message[-1].split()[8][1:-3])
-                    logger.debug(table + ": " + num_rows + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
+                    logger.debug(table + ": " + str(row_count) + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
                 except:
                     logger.warning(table + ": " + "Failed to parse sucessfull export cmd for")
                 logger.debug(schema + '.' + table + " exported")
             else:
                 logger.error("Error exportng " + schema + '.' + table + " :" + cmd_message)
 
-            return file_path, delimiter, num_rows
+            return file_path, delimiter, row_count
         except:
             logger.error("Failed exporting table")
 
@@ -289,7 +289,7 @@ class Database:
             if cmd_code == 0:
                 try:
                     return_message = cmd_message.splitlines()
-                    row_count = str(return_message[-3].split()[0])
+                    row_count = int(return_message[-3].split()[0])
                     try:
                         if return_message[2].split()[0] == 'SQLState':
                             logger.debug(cmd_message)

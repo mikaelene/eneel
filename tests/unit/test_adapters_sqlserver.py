@@ -15,7 +15,8 @@ def db():
         os.getenv('SQLSERVER_TEST_DBNAME'),
         user=os.getenv('SQLSERVER_TEST_USER'),
         password=os.getenv('SQLSERVER_TEST_PASS'),
-        port=os.getenv('SQLSERVER_TEST_PORT'))
+        port=os.getenv('SQLSERVER_TEST_PORT'),
+        trusted_connection=os.getenv('SQLSERVER_TEST_TRUSTED_CONNECTION'))
 
     setup_sql1 = """
     drop table if exists test.test1;
@@ -110,7 +111,7 @@ class TestDatabaseSqlserver:
         return_code, row_count = db.import_table('test_target', 'test1_target', file_path)
 
         assert return_code == 'DONE'
-        assert row_count == '3'
+        assert row_count == 3
 
     def test_generate_create_table_ddl(self, db):
         columns = [(1, 'id_col', 'integer', None, 32, 0)]

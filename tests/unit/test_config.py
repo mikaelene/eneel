@@ -1,6 +1,9 @@
 from eneel.config import *
 import os
 
+from dotenv import find_dotenv, load_dotenv
+load_dotenv(find_dotenv())
+
 test_path = 'testpath'
 test_data = './tests/data/'
 test_config_yml = 'test_connections.yml'
@@ -27,8 +30,11 @@ class TestGetProject:
 class TestConnectionFromConfig:
 
     def test_connection_from_config_postgres(self):
-        credentials = {'host': 'localhost', 'port': 5432, 'user': 'mikaelene', 'password': 'password-1234',
-                       'database': 'dvd2'}
+        credentials = {'host': os.getenv('POSTGRES_TEST_HOST'),
+                       'port': os.getenv('POSTGRES_TEST_PORT'),
+                       'user': os.getenv('POSTGRES_TEST_USER'),
+                       'password': os.getenv('POSTGRES_TEST_PASS'),
+                       'database': os.getenv('POSTGRES_TEST_DBNAME')}
         connection_info = {'name': 'postgres1', 'type': 'postgres', 'read_only': False, 'target': 'prod',
                               'credentials': credentials}
 

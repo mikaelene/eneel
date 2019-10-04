@@ -3,7 +3,6 @@ import pytest
 import os
 
 from dotenv import find_dotenv, load_dotenv
-
 load_dotenv(find_dotenv())
 
 
@@ -107,7 +106,7 @@ class TestDatabasePg:
         return_code, row_count = db.import_table('test_target', 'test1_target', file_path)
 
         assert return_code == 'DONE'
-        assert row_count == '3'
+        assert row_count == 3
 
     def test_generate_create_table_ddl(self, db):
         columns = [(1, 'id_col', 'integer', None, 32, 0)]

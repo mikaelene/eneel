@@ -261,7 +261,7 @@ class Database:
                 logger.error(e)
                 return "ERROR", e
 
-            row_count = str(self.cursor.rowcount)
+            row_count = self.cursor.rowcount
 
             #logger.info(row_count+ " records imported")
 
