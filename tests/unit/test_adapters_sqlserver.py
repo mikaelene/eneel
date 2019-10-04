@@ -48,7 +48,7 @@ def db():
     db.close()
 
 
-class TestDatabasePg:
+class TestDatabaseSqlserver:
 
     def test_init(self, db):
         assert db._dialect == 'sqlserver'

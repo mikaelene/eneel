@@ -112,9 +112,10 @@ def run_load(project_load):
     project_name = project_load.get('project_name')
     source_conninfo = project_load.get('source_conninfo')
     target_conninfo = project_load.get('target_conninfo')
-    logdb_conninfo = project_load.get('logdb')['conninfo']
-    logdb_schema = project_load.get('logdb')['schema']
-    logdb_table = project_load.get('logdb')['table']
+    if project_load.get('logdb'):
+        logdb_conninfo = project_load.get('logdb')['conninfo']
+        logdb_schema = project_load.get('logdb')['schema']
+        logdb_table = project_load.get('logdb')['table']
     project_started_at = project_load.get('project_started_at')
     project = project_load.get('project')
     temp_path = project_load.get('temp_path')
