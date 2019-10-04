@@ -157,8 +157,6 @@ class Database:
             select_stmt += last_column_name
             select_stmt += ' FROM ' + schema + "." + table
 
-            print(select_stmt)
-
             # Where-claues for incremental replication
             if replication_key:
                 replication_where = replication_key + " > " + "'" + max_replication_key + "'"
