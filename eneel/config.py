@@ -39,8 +39,9 @@ def connection_from_config(connection_info):
     read_only = connection_info.get('read_only')
     type = connection_info.get('type')
     if connection_info.get('type') == 'oracle':
-        server = connection_info['credentials'].get('host') + ':' + str(connection_info['credentials'].get('port'))
-        return oracle.Database(server, user, password, database, limit_rows, table_where_clause, read_only)
+        #server = connection_info['credentials'].get('host') + ':' + str(connection_info['credentials'].get('port'))
+        #return oracle.Database(server, user, password, database, limit_rows, table_where_clause, read_only)
+        return oracle.Database(server, user, password, database, port, limit_rows, table_where_clause, read_only)
     elif connection_info.get('type') == 'sqlserver':
         odbc_driver = connection_info['credentials'].get('driver')
         trusted_connection = connection_info['credentials'].get('trusted_connection')
