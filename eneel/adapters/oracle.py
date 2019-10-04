@@ -7,10 +7,9 @@ logger = logging.getLogger('main_logger')
 
 
 class Database:
-    def __init__(self, server, user, password, database, limit_rows=None, table_where_clause=None, read_only=False):
+    def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None, read_only=False):
         try:
-            server_db = server + "/" + database
-            conn_string = user + ", " + password + ", " + server + "/" + database
+            server_db = '{}:{}/{}'.format(server, port, database)
             self._server = server
             self._user = user
             self._password = password
@@ -37,7 +36,6 @@ class Database:
 
     def close(self):
         self._conn.close()
-        #logger.info("Connection closed")
 
     @property
     def connection(self):
@@ -125,20 +123,6 @@ class Database:
         except:
             logger.error("Failed getting columns")
 
-    def create_table_script(self, table_name):
-        try:
-            columns = self.table_columns(table_name)
-            statement = 'CREATE TABLE ' + table_name + '( '
-            for col in columns:
-                if col[2]:
-                    statement = statement + col[0] + ' ' + col[1] + '(' + str(col[2]) + '), '
-                else:
-                    statement = statement + col[0] + ' ' + col[1] + ', '
-            statement = statement[:-2] + ')'
-            return statement
-        except:
-            logger.error("Failed checking table exist")
-
     def check_table_exist(self, table_name):
         try:
             check_statement = """
@@ -152,6 +136,15 @@ class Database:
                 return False
         except:
             logger.error("Failed checking table exist")
+
+    def truncate_table(self, table_name):
+        return 'Not implemented for this adapter'
+
+    def create_schema(self, schema):
+        return 'Not implemented for this adapter'
+
+    def get_max_column_value(self, table_name, column):
+        return 'Not implemented for this adapter'
 
     def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None):
         try:
@@ -234,39 +227,32 @@ class Database:
         except:
             logger.error("Failed exporting table")
 
-    def generate_create_table_ddl(self, schema, table, columns):
-        create_table_sql = "CREATE TABLE " + schema + "." + table + "(\n"
-        for col in columns:
-            column = col.column_name + " " + col.data_type
-            if "char" in col.data_type:
-                column += "("
-                if col.character_maximum_length == -1:
-                    column += "max"
-                else:
-                    column += str(col.character_maximum_length)
-                column += ")"
-            elif "numeric" in col.data_type:
-                column += "(" + str(col.numeric_precision) + "," + str(col.numeric_scale) + ")"
-            elif col.data_type == "USER-DEFINED":
-                column = col.column_name + " TEXT"
-            elif col.data_type == "ARRAY":
-                column = col.column_name + " TEXT"
-            create_table_sql += column + ", \n"
-        create_table_sql = create_table_sql[:-3]
-        create_table_sql += ")"
+    def insert_from_table_and_drop(self, schema, to_table, from_table):
+        return 'Not implemented for this adapter'
 
-        return create_table_sql
+    def switch_tables(self, schema, old_table, new_table):
+        return 'Not implemented for this adapter'
+
+    def import_table(self, schema, table, file, delimiter=','):
+        return 'Not implemented for this adapter'
+
+    def generate_create_table_ddl(self, schema, table, columns):
+        return 'Not implemented for this adapter'
 
     def create_table_from_columns(self, schema, table, columns):
-        if self._read_only:
-            sys.exit("This source is readonly. Terminating load run")
-        table_exists = self.check_table_exist(table)
+        return 'Not implemented for this adapter'
 
-        if table_exists:
-            self.execute("DROP TABLE " + schema + "." + table)
+    def create_log_table(self, schema, table):
+        return 'Not implemented for this adapter'
 
-        self.commit()
-
-        create_table_sql = self.generate_create_table_ddl(schema, table, columns)
-        self.execute(create_table_sql)
-
+    def log(self, schema, table,
+            project=None,
+            project_started_at=None,
+            source_table=None,
+            target_table=None,
+            started_at=None,
+            ended_at=None,
+            status=None,
+            exported_rows=None,
+            imported_rows=None):
+        return 'Not implemented for this adapter'
