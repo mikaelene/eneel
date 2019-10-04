@@ -45,8 +45,9 @@ def connection_from_config(connection_info):
         odbc_driver = connection_info['credentials'].get('driver')
         trusted_connection = connection_info['credentials'].get('trusted_connection')
         as_columnstore = connection_info.get('credentials').get('as_columnstore')
-        return sqlserver.Database(odbc_driver, server, database, limit_rows, user, password, trusted_connection,
-                                  as_columnstore, read_only)
+        codepage = connection_info.get('credentials').get('codepage')
+        return sqlserver.Database(odbc_driver, server, database, port, limit_rows, user, password, trusted_connection,
+                                  as_columnstore, read_only, codepage)
     elif connection_info.get('type') == 'postgres':
         return postgres.Database(server, user, password, database, port, limit_rows, read_only)
     else:
@@ -120,6 +121,7 @@ class Project:
 
         self.temp_path = self.project.get('temp_path', 'temp')
         self.temp_path = os.path.join(self.temp_path , project_name)
+        self.temp_path = os.path.abspath(self.temp_path)
         self.keep_tempfiles = self.project.get('keep_tempfiles', False)
 
         self.workers = self.project.get('parallel_loads', 1)

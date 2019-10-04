@@ -10,11 +10,11 @@ logger = logging.getLogger('main_logger')
 
 
 class Database:
-    def __init__(self, driver, server, database, limit_rows=None, user=None, password=None,
-                 trusted_connection=None, as_columnstore=False, read_only=False):
+    def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
+                 trusted_connection=None, as_columnstore=False, read_only=False, codepage=None):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
-                          database
+                          database + ";PORT=" + str(port)
             if trusted_connection:
                 conn_string += ";trusted_connection=yes"
             else:
@@ -23,11 +23,16 @@ class Database:
             self._user = user
             self._password = password
             self._database = database
+            self._port = port
             self._dialect = "sqlserver"
             self._limit_rows = limit_rows
             self._as_columnstore = as_columnstore
             self._trusted_connection = trusted_connection
             self._read_only = read_only
+            if codepage:
+                self._codepage = codepage
+            else:
+                self._codepage = '1252'
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
@@ -180,7 +185,7 @@ class Database:
         except:
             logger.debug("Failed getting max column value")
 
-    def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None, codepage='1252'):
+    def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None):
         try:
             # Generate SQL statement for extract
             select_stmt = '"SELECT '
@@ -209,7 +214,7 @@ class Database:
 
             # Generate bcp command
             bcp_out = "bcp " + select_stmt + " queryout " + \
-                      file_path + " -t" + delimiter + " -c -C" + codepage + " -S" + self._server
+                      file_path + " -t" + delimiter + " -c -C" + self._codepage + " -S" + self._server
             if self._trusted_connection:
                 bcp_out += " -T"
             else:
