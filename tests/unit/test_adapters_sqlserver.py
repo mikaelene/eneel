@@ -1,37 +1,42 @@
-from eneel.adapters.postgres import *
+from eneel.adapters.sqlserver import *
 import pytest
 import os
 
 from dotenv import find_dotenv, load_dotenv
+
 load_dotenv(find_dotenv())
 
 
 @pytest.fixture
 def db():
     db = Database(
-        os.getenv('POSTGRES_TEST_HOST'),
-        os.getenv('POSTGRES_TEST_USER'),
-        os.getenv('POSTGRES_TEST_PASS'),
-        os.getenv('POSTGRES_TEST_DBNAME'),
-        os.getenv('POSTGRES_TEST_PORT'))
+        os.getenv('SQLSERVER_TEST_DRIVER'),
+        os.getenv('SQLSERVER_TEST_HOST'),
+        os.getenv('SQLSERVER_TEST_DBNAME'),
+        user=os.getenv('SQLSERVER_TEST_USER'),
+        password=os.getenv('SQLSERVER_TEST_PASS'),
+        port=os.getenv('SQLSERVER_TEST_PORT'),
+        trusted_connection=os.getenv('SQLSERVER_TEST_TRUSTED_CONNECTION'))
 
-    setup_sql = """
+    setup_sql1 = """
     drop table if exists test.test1;
-    drop schema if exists test;
-    
-    create schema test;
-    
+    drop schema if exists test;"""
+    db.execute(setup_sql1)
+
+    db.execute('create schema test;')
+
+    setup_sql2 = """
     create table test.test1(
     id_col 			int,
     name_col		varchar(64),
-    datetime_col	timestamp
+    datetime_col	datetime2
     ); 
     
     insert into test.test1 values(1, 'First', '2019-10-01 11:00:00');
     insert into test.test1 values(2, 'Second', '2019-10-02 12:00:00');
     insert into test.test1 values(3, 'Third', '2019-10-03 13:00:00');
     """
-    db.execute(setup_sql)
+    db.execute(setup_sql2)
 
     yield db
 
@@ -44,10 +49,10 @@ def db():
     db.close()
 
 
-class TestDatabasePg:
+class TestDatabaseSqlserver:
 
     def test_init(self, db):
-        assert db._dialect == 'postgres'
+        assert db._dialect == 'sqlserver'
 
     def test_schemas(self, db):
         schemas = db.schemas()
@@ -110,10 +115,10 @@ class TestDatabasePg:
 
     def test_generate_create_table_ddl(self, db):
         columns = [(1, 'id_col', 'integer', None, 32, 0)]
-        ddl = db.generate_create_table_ddl('test', 'test1', columns)
 
+        ddl = db.generate_create_table_ddl('test', 'test1', columns)
         assert ddl == """CREATE TABLE test.test1(
-id_col integer)"""
+[id_col] integer)"""
 
     def test_create_log_table(self, db):
         db.execute('drop table if exists log_schema.log_table')

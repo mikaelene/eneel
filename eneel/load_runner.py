@@ -331,7 +331,7 @@ def run_load(project_load):
     end_time = time()
     execution_time = end_time - load_start_time
 
-    printer.print_load_line(index, total, return_code, full_source_table, import_row_count, execution_time)
+    printer.print_load_line(index, total, return_code, full_source_table, str(import_row_count), execution_time)
 
     if logdb_conninfo:
         logdb = config.connection_from_config(logdb_conninfo)
