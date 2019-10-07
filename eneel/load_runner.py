@@ -198,7 +198,7 @@ def run_load(project_load):
 
         # Export table
         try:
-            file, delimiter, export_row_count = source.export_table(schema=source_schema,
+            path, delimiter, export_row_count = source.export_table(schema=source_schema,
                                                                     table=source_table,
                                                                     columns=columns,
                                                                     path=temp_path_load,
@@ -218,7 +218,7 @@ def run_load(project_load):
 
         try:
             # Import into temp table
-            return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+            return_code, import_row_count = target.import_table(target_schema, target_table_tmp, path, delimiter)
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed import into temptable")
             return return_code

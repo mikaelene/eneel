@@ -4,6 +4,7 @@ import psycopg2
 import psycopg2.extras
 from time import time
 from datetime import datetime
+from glob import glob
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -228,7 +229,7 @@ class Database:
             if parallelization_key:
                 min_parallelization_key, max_parallelization_key = self.get_min_max_column_value(schema + '.' + table,
                                                                                                  parallelization_key)
-                print(min_parallelization_key, max_parallelization_key)
+                #print(min_parallelization_key, max_parallelization_key)
                 batch_size = 100
                 batch_id = 1
                 batch_start = min_parallelization_key
@@ -239,22 +240,22 @@ class Database:
                     select_stmt2 = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
                     batch_start += batch_size
                     batch_id += 1
-                    print(file_path2, select_stmt2)
+                    #print(file_path2, select_stmt2)
 
                     row_count = self.export_query(select_stmt2, file_path2, delimiter)
                     total_row_count += row_count
-                print(total_row_count)
+                #print(total_row_count)
 
+            else:
+                file_name = self._database + "_" + schema + "_" + table + ".csv"
+                file_path = os.path.join(path, file_name)
 
-            file_name = self._database + "_" + schema + "_" + table + ".csv"
-            file_path = os.path.join(path, file_name)
+                total_row_count = self.export_query(select_stmt, file_path, delimiter)
 
-            row_count = self.export_query(select_stmt, file_path, delimiter)
-
-            logger.debug(str(row_count) + " records exported")
+            logger.debug(str(total_row_count) + " records exported")
 
             # Do not return file.
-            return path, delimiter, row_count
+            return path, delimiter, total_row_count
         except:
             logger.error("Failed exporting table")
 
@@ -290,26 +291,30 @@ class Database:
         except:
             logger.error("Failed to switch tables")
 
-    def import_table(self, schema, table, file, delimiter=','):
+    def import_table(self, schema, table, path, delimiter=','):
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
         try:
             schema_table = schema + '.' + table
+            total_row_count = 0
+            csv_files = glob(os.path.join(path, '*.csv'))
+            for file in csv_files:
 
-            sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
-            file = open(file, "r")
+                sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
+                file = open(file, "r")
 
-            try:
-                self.cursor.copy_expert(sql=sql % (schema_table, delimiter), file=file)
-            except psycopg2.Error as e:
-                logger.error(e)
-                return "ERROR", e
+                try:
+                    self.cursor.copy_expert(sql=sql % (schema_table, delimiter), file=file)
+                except psycopg2.Error as e:
+                    logger.error(e)
+                    return "ERROR", e
 
-            row_count = self.cursor.rowcount
+                row_count = self.cursor.rowcount
+                total_row_count += row_count
 
             #logger.info(row_count+ " records imported")
 
-            return "DONE", row_count
+            return "DONE", total_row_count
 
         except:
             logger.error("Failed importing table")
