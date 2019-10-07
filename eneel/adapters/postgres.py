@@ -10,6 +10,22 @@ import logging
 logger = logging.getLogger('main_logger')
 
 
+def export_querys(server, user, password, database, port,
+                 query, file_path, delimiter):
+    print('starting export')
+    db = Database(server, user, password, database, port)
+    # Create and run the cmd
+    sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
+    file = open(file_path, "w")
+    try:
+        db.cursor.copy_expert(sql=sql % (query, delimiter), file=file)
+        row_count = db.cursor.rowcount
+        return row_count
+    except psycopg2.Error as e:
+        logger.error(e)
+    finally:
+        db.close()
+
 class Database:
     def __init__(self, server, user, password, database, port=5432, limit_rows=None, read_only=False):
         try:
@@ -235,6 +251,11 @@ class Database:
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
+                servers = []
+                users = []
+                passwords = []
+                databases = []
+                ports = []
                 file_paths =[]
                 batch_stmts = []
                 delimiters = []
@@ -244,6 +265,11 @@ class Database:
                     file_path = os.path.join(path, file_name)
 
                     batch_stmt = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
+                    servers.append(self._server)
+                    users.append(self._user)
+                    passwords.append(self._password)
+                    databases.append(self._database)
+                    ports.append(self._port)
                     file_paths.append(file_path)
                     batch_stmts.append(batch_stmt)
                     delimiters.append(delimiter)
@@ -261,11 +287,14 @@ class Database:
                 from concurrent.futures import ProcessPoolExecutor as Executor
 
                 try:
-                    with Executor(max_workers=1) as executor:
-                        for row_count in executor.map(self.export_query, batch_stmts, file_paths, delimiters):
+                    with Executor(max_workers=10) as executor:
+                        for row_count in executor.map(export_querys,
+                                                      servers, users, passwords, databases, ports,
+                                                      batch_stmts, file_paths, delimiters):
                             total_row_count += row_count
                 except Exception as exc:
                     print(exc)
+
 
                 #for batch in batches:
                 #    row_count = self.export_query(batch[0], batch[1], delimiter)
