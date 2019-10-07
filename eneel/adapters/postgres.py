@@ -184,6 +184,7 @@ class Database:
             logger.debug("Failed getting min and max column value")
 
     def export_query(self, query, file_path, delimiter):
+        print('starting export')
         # Create and run the cmd
         sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
         file = open(file_path, "w")
@@ -230,21 +231,45 @@ class Database:
                 min_parallelization_key, max_parallelization_key = self.get_min_max_column_value(schema + '.' + table,
                                                                                                  parallelization_key)
                 #print(min_parallelization_key, max_parallelization_key)
-                batch_size = 100
+                batch_size = 1000000
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
+                file_paths =[]
+                batch_stmts = []
+                delimiters = []
+                batches = []
                 while batch_start < max_parallelization_key:
-                    file_name2 = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
-                    file_path2 = os.path.join(path, file_name2)
-                    select_stmt2 = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
+                    file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
+                    file_path = os.path.join(path, file_name)
+
+                    batch_stmt = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
+                    file_paths.append(file_path)
+                    batch_stmts.append(batch_stmt)
+                    delimiters.append(delimiter)
+                    batch = (batch_stmt, file_path)
+                    batches.append(batch)
                     batch_start += batch_size
                     batch_id += 1
-                    #print(file_path2, select_stmt2)
+                    #print(file_path, bach_stmt)
 
-                    row_count = self.export_query(select_stmt2, file_path2, delimiter)
-                    total_row_count += row_count
+                    #row_count = self.export_query(batch_stmt, file_path, delimiter)
+                    #total_row_count += row_count
                 #print(total_row_count)
+
+                #from concurrent.futures import ThreadPoolExecutor as Executor
+                from concurrent.futures import ProcessPoolExecutor as Executor
+
+                try:
+                    with Executor(max_workers=1) as executor:
+                        for row_count in executor.map(self.export_query, batch_stmts, file_paths, delimiters):
+                            total_row_count += row_count
+                except Exception as exc:
+                    print(exc)
+
+                #for batch in batches:
+                #    row_count = self.export_query(batch[0], batch[1], delimiter)
+                #    total_row_count += row_count
 
             else:
                 file_name = self._database + "_" + schema + "_" + table + ".csv"
