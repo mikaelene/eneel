@@ -172,7 +172,37 @@ class Database:
         except:
             logger.debug("Failed getting max column value")
 
-    def export_table(self, schema, table, columns, path, delimiter=',', replication_key=None, max_replication_key=None):
+    def get_min_max_column_value(self, table_name, column):
+        try:
+            sql = "SELECT MIN(" + column + "), MAX(" + column + ") FROM " + table_name
+            res = self.query(sql)
+            min_value = res[0][0]
+            max_value = res[0][1]
+            return min_value, max_value
+        except:
+            logger.debug("Failed getting min and max column value")
+
+    def export_query(self, query, file_path, delimiter):
+        # Create and run the cmd
+        sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
+        file = open(file_path, "w")
+        try:
+            self.cursor.copy_expert(sql=sql % (query, delimiter), file=file)
+            row_count = self.cursor.rowcount
+            return row_count
+        except psycopg2.Error as e:
+            logger.error(e)
+
+    def export_table(self,
+                     schema,
+                     table,
+                     columns,
+                     path,
+                     delimiter=',',
+                     replication_key=None,
+                     max_replication_key=None,
+                     parallelization_key=None):
+
         try:
             # Generate SQL statement for extract
             select_stmt = "SELECT "
@@ -194,23 +224,37 @@ class Database:
                 select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
             logger.debug(select_stmt)
 
-            # Generate file name
+            # Add logic for parallelization_key
+            if parallelization_key:
+                min_parallelization_key, max_parallelization_key = self.get_min_max_column_value(schema + '.' + table,
+                                                                                                 parallelization_key)
+                print(min_parallelization_key, max_parallelization_key)
+                batch_size = 100
+                batch_id = 1
+                batch_start = min_parallelization_key
+                total_row_count = 0
+                while batch_start < max_parallelization_key:
+                    file_name2 = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
+                    file_path2 = os.path.join(path, file_name2)
+                    select_stmt2 = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
+                    batch_start += batch_size
+                    batch_id += 1
+                    print(file_path2, select_stmt2)
+
+                    row_count = self.export_query(select_stmt2, file_path2, delimiter)
+                    total_row_count += row_count
+                print(total_row_count)
+
+
             file_name = self._database + "_" + schema + "_" + table + ".csv"
             file_path = os.path.join(path, file_name)
 
-            # Create and run the cmd
-            sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
-            file = open(file_path, "w")
-            try:
-                self.cursor.copy_expert(sql=sql % (select_stmt, delimiter), file=file)
-            except psycopg2.Error as e:
-                logger.error(e)
-
-            row_count = self.cursor.rowcount
+            row_count = self.export_query(select_stmt, file_path, delimiter)
 
             logger.debug(str(row_count) + " records exported")
 
-            return file_path, delimiter, row_count
+            # Do not return file.
+            return path, delimiter, row_count
         except:
             logger.error("Failed exporting table")
 

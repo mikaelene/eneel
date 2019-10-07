@@ -88,6 +88,11 @@ class TestDatabasePg:
 
         assert db.get_max_column_value('test.test1', 'id_col') == '3'
 
+    def test_get_min_max_column_value(self, db):
+        min, max = db.get_min_max_column_value('test.test1', 'id_col')
+        assert min == 1
+        assert max == 3
+
     def test_export_table(self, tmpdir, db):
         columns = [(1, 'id_col', 'integer', None, 32, 0)]
         path = tmpdir
