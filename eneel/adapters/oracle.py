@@ -146,7 +146,15 @@ class Database:
     def get_max_column_value(self, table_name, column):
         return 'Not implemented for this adapter'
 
-    def export_table(self, schema, table, columns, path, delimiter='|', replication_key=None, max_replication_key=None):
+    def export_table(self,
+                     schema,
+                     table,
+                     columns,
+                     path,
+                     delimiter=',',
+                     replication_key=None,
+                     max_replication_key=None,
+                     parallelization_key=None):
         try:
             # Generate SQL statement for extract
             select_stmt = "SELECT "
@@ -223,7 +231,7 @@ class Database:
             else:
                 logger.error("Error exportng " + schema + '.' + table + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
 
-            return file_path, delimiter, None
+            return path, delimiter, None
         except:
             logger.error("Failed exporting table")
 

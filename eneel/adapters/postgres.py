@@ -45,7 +45,6 @@ def parallelized_import(server, user, password, database, port,
         db.close()
 
 
-
 class Database:
     def __init__(self, server, user, password, database, port=5432, limit_rows=None, read_only=False):
         try:
@@ -267,7 +266,7 @@ class Database:
                 min_parallelization_key, max_parallelization_key = self.get_min_max_column_value(schema + '.' + table,
                                                                                                  parallelization_key)
                 #print(min_parallelization_key, max_parallelization_key)
-                batch_size = 1000000
+                batch_size = 100
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
@@ -283,6 +282,7 @@ class Database:
                 while batch_start < max_parallelization_key:
                     file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
                     file_path = os.path.join(path, file_name)
+                    print(file_name)
 
                     batch_stmt = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
                     servers.append(self._server)
@@ -304,7 +304,7 @@ class Database:
                 #print(total_row_count)
 
                 try:
-                    with Executor(max_workers=10) as executor:
+                    with Executor(max_workers=5) as executor:
                         for row_count in executor.map(parallelized_export,
                                                       servers, users, passwords, databases, ports,
                                                       batch_stmts, file_paths, delimiters):
