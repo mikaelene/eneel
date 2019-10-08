@@ -11,56 +11,6 @@ import logging
 logger = logging.getLogger('main_logger')
 
 
-def parallelized_export(server, user, password, database, port,
-                        query, file_path, delimiter):
-    print('starting export')
-    db = Database(server, user, password, database, port)
-    # Create and run the cmd
-    sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
-    file = open(file_path, "w")
-    try:
-        db.cursor.copy_expert(sql=sql % (query, delimiter), file=file)
-        row_count = db.cursor.rowcount
-        return row_count
-    except psycopg2.Error as e:
-        logger.error(e)
-    finally:
-        db.close()
-
-
-def parallelized_import(server, user, password, database, port, trusted_connection, codepage,
-                        schema, table, file_path, delimiter):
-    print('starting import')
-
-    # Import data
-    bcp_in = "bcp [" + database + "].[" + schema + "].[" + table + "] in " + \
-             file_path + " -t" + delimiter + " -c -C" + codepage + " -U -b100000 -S" + server
-    if trusted_connection:
-        bcp_in += " -T"
-    else:
-        bcp_in += " -U" + user + " -P" + password
-
-    logger.debug(bcp_in)
-    cmd_code, cmd_message = utils.run_cmd(bcp_in)
-    if cmd_code == 0:
-        try:
-            return_message = cmd_message.splitlines()
-            row_count = int(return_message[-3].split()[0])
-            try:
-                if return_message[2].split()[0] == 'SQLState':
-                    logger.debug(cmd_message)
-                    return "WARN", row_count
-            except:
-                pass
-
-            return "DONE", row_count
-        except:
-            logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
-            return "DONE", None
-    else:
-        logger.debug("Error importing " + schema + "." + table + " :" + cmd_message)
-
-
 class Database:
     def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
                  trusted_connection=None, as_columnstore=False, read_only=False, codepage=None):
@@ -251,7 +201,6 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
 
-        print('start exporting')
         # Export data
         # Generate bcp command
         bcp_out = "bcp " + query + " queryout " + \
@@ -343,7 +292,7 @@ class Database:
                         for row_count in executor.map(self.export_query, batch_stmts, file_paths, delimiters):
                             total_row_count += row_count
                 except Exception as exc:
-                    print(exc)
+                    logger.error(exc)
 
             else:
                 # Generate file name
@@ -402,25 +351,26 @@ class Database:
 
             logger.debug(bcp_in)
             cmd_code, cmd_message = utils.run_cmd(bcp_in)
+            return_code = 'ERROR'
+            row_count = 0
+
             if cmd_code == 0:
                 try:
                     return_message = cmd_message.splitlines()
-                    row_count = int(return_message[-3].split()[0])
                     try:
+                        row_count = int(return_message[-3].split()[0])
+                        return_code = "DONE"
+                    except:
                         if return_message[2].split()[0] == 'SQLState':
                             logger.debug(cmd_message)
-                            return "WARN", row_count
-                    except:
-                        pass
-
-                    return "DONE", row_count
+                            return_code = "WARN"
                 except:
                     logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
-                    return "DONE", None
             else:
                 logger.debug("Error importing " + schema + "." + table + " :" + cmd_message)
         except:
             logger.error("Failed importing table")
+        return return_code, row_count
 
     def import_table(self, schema, table, path, delimiter=',', codepage='1252'):
         if self._read_only:
@@ -451,16 +401,16 @@ class Database:
                 delimiters.append(delimiter)
                 codepages.append(codepage)
 
-            total_row_count = 0
+            total_row_counts = []
             return_codes = []
             try:
                 with Executor(max_workers=10) as executor:
                     for return_code, row_count in executor.map(self.import_file,
                                                   schemas, tables,  file_paths, delimiters, codepages):
                         return_codes.append(return_code)
-                        total_row_count += row_count
+                        total_row_counts.append(row_count)
             except Exception as exc:
-                print(exc)
+                logger.error(exc)
 
             if 'ERROR' in return_codes:
                 return_code == 'ERROR'
@@ -468,6 +418,8 @@ class Database:
                 return_code == 'WARN'
             else:
                 return_code == 'DONE'
+
+            total_row_count = sum(total_row_counts)
 
             return return_code, total_row_count
 

@@ -282,7 +282,6 @@ class Database:
                 while batch_start < max_parallelization_key:
                     file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
                     file_path = os.path.join(path, file_name)
-                    print(file_name)
 
                     batch_stmt = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
                     servers.append(self._server)
