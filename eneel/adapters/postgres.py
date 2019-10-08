@@ -44,7 +44,8 @@ def parallelized_import(server, user, password, database, port,
 
 
 class Database:
-    def __init__(self, server, user, password, database, port=5432, limit_rows=None, read_only=False):
+    def __init__(self, server, user, password, database, port=5432, limit_rows=None, read_only=False,
+                 table_parallel_loads=10, table_parallel_batch_size=10000000):
         try:
             conn_string = "host=" + server + " dbname=" + \
                           database + " user=" + user + " password=" + password
@@ -56,6 +57,8 @@ class Database:
             self._dialect = "postgres"
             self._limit_rows = limit_rows
             self._read_only = read_only
+            self._table_parallel_loads = table_parallel_loads
+            self._table_parallel_batch_size = table_parallel_batch_size
 
             self._conn = psycopg2.connect(conn_string)
             self._conn.autocommit = True
@@ -216,11 +219,11 @@ class Database:
         except:
             logger.debug("Failed getting min and max column value")
 
-    def get_min_max_batch(self, table_name, column, batch_size=1000000):
+    def get_min_max_batch(self, table_name, column):
         try:
             sql = "SELECT MIN(" + column + "), MAX(" + column
             sql += "), ceil((max( " + column + ") - min("
-            sql += column + ")) / (count(*)/" + str(batch_size) + ".0)) FROM " + table_name
+            sql += column + ")) / (count(*)/" + str(self._table_parallel_batch_size) + ".0)) FROM " + table_name
             res = self.query(sql)
             min_value = res[0][0]
             max_value = res[0][1]
@@ -273,11 +276,10 @@ class Database:
 
             # Add logic for parallelization_key
             if parallelization_key:
-                batch_size = 100
                 min_parallelization_key, max_parallelization_key, batch_size_key = self.get_min_max_batch(
                     schema + '.' + table,
                     parallelization_key,
-                    batch_size)
+                    self._table_parallel_batch_size)
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
@@ -309,7 +311,7 @@ class Database:
                     batch_id += 1
 
                 try:
-                    with Executor(max_workers=5) as executor:
+                    with Executor(max_workers=self._table_parallel_loads) as executor:
                         for row_count in executor.map(parallelized_export,
                                                       servers, users, passwords, databases, ports,
                                                       batch_stmts, file_paths, delimiters):
@@ -389,7 +391,7 @@ class Database:
                 delimiters.append(delimiter)
 
             try:
-                with Executor(max_workers=10) as executor:
+                with Executor(max_workers=self._table_parallel_loads) as executor:
                     for row_count in executor.map(parallelized_import,
                                                   servers, users, passwords, databases, ports,
                                                   schema_tables, file_paths, delimiters):
