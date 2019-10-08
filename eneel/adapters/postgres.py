@@ -13,7 +13,6 @@ logger = logging.getLogger('main_logger')
 
 def parallelized_export(server, user, password, database, port,
                         query, file_path, delimiter):
-    print('starting export')
     db = Database(server, user, password, database, port)
     # Create and run the cmd
     sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
@@ -30,7 +29,6 @@ def parallelized_export(server, user, password, database, port,
 
 def parallelized_import(server, user, password, database, port,
                         schema_table, file_path, delimiter):
-    print('starting import')
     db = Database(server, user, password, database, port)
     # Create and run the cmd
     sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
@@ -218,8 +216,20 @@ class Database:
         except:
             logger.debug("Failed getting min and max column value")
 
+    def get_min_max_batch(self, table_name, column, batch_size=1000000):
+        try:
+            sql = "SELECT MIN(" + column + "), MAX(" + column
+            sql += "), ceil((max( " + column + ") - min("
+            sql += column + ")) / (count(*)/" + str(batch_size) + ".0)) FROM " + table_name
+            res = self.query(sql)
+            min_value = res[0][0]
+            max_value = res[0][1]
+            batch_size_key = res[0][2]
+            return min_value, max_value, batch_size_key
+        except:
+            logger.debug("Failed getting min and max column value")
+
     def export_query(self, query, file_path, delimiter):
-        print('starting export')
         # Create and run the cmd
         sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
         file = open(file_path, "w")
@@ -263,10 +273,11 @@ class Database:
 
             # Add logic for parallelization_key
             if parallelization_key:
-                min_parallelization_key, max_parallelization_key = self.get_min_max_column_value(schema + '.' + table,
-                                                                                                 parallelization_key)
-                #print(min_parallelization_key, max_parallelization_key)
                 batch_size = 100
+                min_parallelization_key, max_parallelization_key, batch_size_key = self.get_min_max_batch(
+                    schema + '.' + table,
+                    parallelization_key,
+                    batch_size)
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
@@ -283,7 +294,7 @@ class Database:
                     file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
                     file_path = os.path.join(path, file_name)
 
-                    batch_stmt = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
+                    batch_stmt = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size_key - 1)
                     servers.append(self._server)
                     users.append(self._user)
                     passwords.append(self._password)
@@ -294,13 +305,8 @@ class Database:
                     delimiters.append(delimiter)
                     batch = (batch_stmt, file_path)
                     batches.append(batch)
-                    batch_start += batch_size
+                    batch_start += batch_size_key
                     batch_id += 1
-                    #print(file_path, bach_stmt)
-
-                    #row_count = self.export_query(batch_stmt, file_path, delimiter)
-                    #total_row_count += row_count
-                #print(total_row_count)
 
                 try:
                     with Executor(max_workers=5) as executor:
@@ -310,11 +316,6 @@ class Database:
                             total_row_count += row_count
                 except Exception as exc:
                     print(exc)
-
-
-                #for batch in batches:
-                #    row_count = self.export_query(batch[0], batch[1], delimiter)
-                #    total_row_count += row_count
 
             else:
                 file_name = self._database + "_" + schema + "_" + table + ".csv"
