@@ -227,7 +227,7 @@ class Database:
             batch_size_key = res[0][2]
             return min_value, max_value, batch_size_key
         except:
-            logger.debug("Failed getting min and max column value")
+            logger.debug("Failed getting min, max and batch column value")
 
     def export_query(self, query, file_path, delimiter):
         # Create and run the cmd
