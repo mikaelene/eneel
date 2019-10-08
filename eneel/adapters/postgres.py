@@ -5,13 +5,14 @@ import psycopg2.extras
 from time import time
 from datetime import datetime
 from glob import glob
+from concurrent.futures import ProcessPoolExecutor as Executor
 
 import logging
 logger = logging.getLogger('main_logger')
 
 
-def export_querys(server, user, password, database, port,
-                 query, file_path, delimiter):
+def parallelized_export(server, user, password, database, port,
+                        query, file_path, delimiter):
     print('starting export')
     db = Database(server, user, password, database, port)
     # Create and run the cmd
@@ -25,6 +26,25 @@ def export_querys(server, user, password, database, port,
         logger.error(e)
     finally:
         db.close()
+
+
+def parallelized_import(server, user, password, database, port,
+                        schema_table, file_path, delimiter):
+    print('starting import')
+    db = Database(server, user, password, database, port)
+    # Create and run the cmd
+    sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
+    file = open(file_path, "r")
+    try:
+        db.cursor.copy_expert(sql=sql % (schema_table, delimiter), file=file)
+        row_count = db.cursor.rowcount
+        return row_count
+    except psycopg2.Error as e:
+        logger.error(e)
+    finally:
+        db.close()
+
+
 
 class Database:
     def __init__(self, server, user, password, database, port=5432, limit_rows=None, read_only=False):
@@ -283,12 +303,9 @@ class Database:
                     #total_row_count += row_count
                 #print(total_row_count)
 
-                #from concurrent.futures import ThreadPoolExecutor as Executor
-                from concurrent.futures import ProcessPoolExecutor as Executor
-
                 try:
                     with Executor(max_workers=10) as executor:
-                        for row_count in executor.map(export_querys,
+                        for row_count in executor.map(parallelized_export,
                                                       servers, users, passwords, databases, ports,
                                                       batch_stmts, file_paths, delimiters):
                             total_row_count += row_count
@@ -352,19 +369,33 @@ class Database:
             schema_table = schema + '.' + table
             total_row_count = 0
             csv_files = glob(os.path.join(path, '*.csv'))
-            for file in csv_files:
+            servers = []
+            users = []
+            passwords = []
+            databases = []
+            ports = []
+            file_paths = []
+            schema_tables = []
+            delimiters = []
 
-                sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
-                file = open(file, "r")
+            for file_path in csv_files:
+                servers.append(self._server)
+                users.append(self._user)
+                passwords.append(self._password)
+                databases.append(self._database)
+                ports.append(self._port)
+                file_paths.append(file_path)
+                schema_tables.append(schema_table)
+                delimiters.append(delimiter)
 
-                try:
-                    self.cursor.copy_expert(sql=sql % (schema_table, delimiter), file=file)
-                except psycopg2.Error as e:
-                    logger.error(e)
-                    return "ERROR", e
-
-                row_count = self.cursor.rowcount
-                total_row_count += row_count
+            try:
+                with Executor(max_workers=10) as executor:
+                    for row_count in executor.map(parallelized_import,
+                                                  servers, users, passwords, databases, ports,
+                                                  schema_tables, file_paths, delimiters):
+                        total_row_count += row_count
+            except Exception as exc:
+                print(exc)
 
             #logger.info(row_count+ " records imported")
 
