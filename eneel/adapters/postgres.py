@@ -278,8 +278,7 @@ class Database:
             if parallelization_key:
                 min_parallelization_key, max_parallelization_key, batch_size_key = self.get_min_max_batch(
                     schema + '.' + table,
-                    parallelization_key,
-                    self._table_parallel_batch_size)
+                    parallelization_key)
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
@@ -310,8 +309,12 @@ class Database:
                     batch_start += batch_size_key
                     batch_id += 1
 
+                table_workers = self._table_parallel_loads
+                if len(batch_stmts) < table_workers:
+                    table_workers = len(batch_stmts)
+
                 try:
-                    with Executor(max_workers=self._table_parallel_loads) as executor:
+                    with Executor(max_workers=table_workers) as executor:
                         for row_count in executor.map(parallelized_export,
                                                       servers, users, passwords, databases, ports,
                                                       batch_stmts, file_paths, delimiters):
