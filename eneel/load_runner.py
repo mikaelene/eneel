@@ -186,6 +186,8 @@ def run_load(project_load):
 
     # Load type
     replication_method = table.get('replication_method')
+    parallelization_key = table.get('parallelization_key')
+    #print(parallelization_key)
 
     if not replication_method or replication_method == "FULL_TABLE":
         index = load_order
@@ -196,8 +198,14 @@ def run_load(project_load):
 
         # Export table
         try:
-            file, delimiter, export_row_count = source.export_table(source_schema, source_table, columns, temp_path_load,
-                                              csv_delimiter)
+            path, delimiter, export_row_count = source.export_table(schema=source_schema,
+                                                                    table=source_table,
+                                                                    columns=columns,
+                                                                    path=temp_path_load,
+                                                                    delimiter=csv_delimiter,
+                                                                    #replication_key=None,
+                                                                    #max_replication_key=None,
+                                                                    parallelization_key=parallelization_key)
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
             return return_code
@@ -210,7 +218,7 @@ def run_load(project_load):
 
         try:
             # Import into temp table
-            return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file, delimiter)
+            return_code, import_row_count = target.import_table(target_schema, target_table_tmp, path, delimiter)
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed import into temptable")
             return return_code

@@ -38,19 +38,20 @@ def connection_from_config(connection_info):
     table_where_clause = connection_info.get('credentials').get('table_where_clause')
     read_only = connection_info.get('read_only')
     type = connection_info.get('type')
+    table_parallel_loads = connection_info.get('credentials').get('table_parallel_loads', 10)
+    table_parallel_batch_size = connection_info.get('credentials').get('table_parallel_batch_size', 1000000)
+    #print(table_parallel_batch_size)
     if connection_info.get('type') == 'oracle':
-        #server = connection_info['credentials'].get('host') + ':' + str(connection_info['credentials'].get('port'))
-        #return oracle.Database(server, user, password, database, limit_rows, table_where_clause, read_only)
-        return oracle.Database(server, user, password, database, port, limit_rows, table_where_clause, read_only)
+        return oracle.Database(server, user, password, database, port, limit_rows, table_where_clause, read_only, table_parallel_loads, table_parallel_batch_size)
     elif connection_info.get('type') == 'sqlserver':
         odbc_driver = connection_info['credentials'].get('driver')
         trusted_connection = connection_info['credentials'].get('trusted_connection')
         as_columnstore = connection_info.get('credentials').get('as_columnstore')
         codepage = connection_info.get('credentials').get('codepage')
         return sqlserver.Database(odbc_driver, server, database, port, limit_rows, user, password, trusted_connection,
-                                  as_columnstore, read_only, codepage)
+                                  as_columnstore, read_only, codepage, table_parallel_loads, table_parallel_batch_size)
     elif connection_info.get('type') == 'postgres':
-        return postgres.Database(server, user, password, database, port, limit_rows, read_only)
+        return postgres.Database(server, user, password, database, port, limit_rows, read_only, table_parallel_loads, table_parallel_batch_size)
     else:
         logger.error('source type not found')
 
