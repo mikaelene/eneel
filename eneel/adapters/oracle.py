@@ -20,7 +20,8 @@ def run_export_cmd(cmd_file):
 
 
 class Database:
-    def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None, read_only=False):
+    def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None, read_only=False,
+                 table_parallel_loads=10, table_parallel_batch_size=10000000):
         try:
             server_db = '{}:{}/{}'.format(server, port, database)
             self._server = server
@@ -32,6 +33,8 @@ class Database:
             self._limit_rows = limit_rows
             self._table_where_clause = table_where_clause
             self._read_only = read_only
+            self._table_parallel_loads = table_parallel_loads
+            self._table_parallel_batch_size = table_parallel_batch_size
 
             self._conn = cx_Oracle.connect(user, password, server_db)
             self._cursor = self._conn.cursor()
@@ -169,6 +172,19 @@ class Database:
         except:
             logger.debug("Failed getting min and max column value")
 
+    def get_min_max_batch(self, table_name, column):
+        try:
+            sql = "SELECT MIN(" + column + "), MAX(" + column
+            sql += "), ceil((max( " + column + ") - min("
+            sql += column + ")) / (count(*)/" + str(self._table_parallel_batch_size) + ".0)) FROM " + table_name
+            res = self.query(sql)
+            min_value = int(res[0][0])
+            max_value = int(res[0][1])
+            batch_size_key = int(res[0][2])
+            return min_value, max_value, batch_size_key
+        except:
+            logger.debug("Failed getting min, max and batch column value")
+
     def generate_cmd_file(self, sql_file):
         cmd = "SET NLS_LANG=SWEDISH_SWEDEN.WE8ISO8859P1\n"
         cmd += "set NLS_NUMERIC_CHARACTERS=. \n"
@@ -239,9 +255,9 @@ class Database:
         try:
             # Add logic for parallelization_key
             if parallelization_key:
-                min_parallelization_key, max_parallelization_key = self.get_min_max_column_value(schema + '.' + table,
-                                                                                                 parallelization_key)
-                batch_size = 1000000
+                min_parallelization_key, max_parallelization_key, batch_size_key = self.get_min_max_batch(
+                    schema + '.' + table,
+                    parallelization_key)
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
@@ -253,7 +269,7 @@ class Database:
                 while batch_start < max_parallelization_key:
                     file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
                     file_path = os.path.join(path, file_name)
-                    parallelization_where = parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size - 1)
+                    parallelization_where = parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size_key - 1)
                     batch_stmt = self.generate_spool_query(columns, delimiter, schema, table, replication_key, max_replication_key, parallelization_where)
                     spool_cmd = self.generate_spool_cmd(file_path, batch_stmt)
 
@@ -272,12 +288,16 @@ class Database:
                     #batch = (batch_stmt, file_path)
                     #batches.append(batch)
                     cmds_files.append(cmd_file)
-                    batch_start += batch_size
+                    batch_start += batch_size_key
                     batch_id += 1
 
+                table_workers = self._table_parallel_loads
+                if len(cmds_files) < table_workers:
+                    table_workers = len(cmds_files)
+
                 try:
-                    with Executor(max_workers=10) as executor:
-                        for row_count in executor.map(utils.run_cmd, cmds_files):
+                    with Executor(max_workers=table_workers) as executor:
+                        for row_count in executor.map(run_export_cmd, cmds_files):
                             total_row_count += row_count
                 except Exception as exc:
                     logger.error(exc)

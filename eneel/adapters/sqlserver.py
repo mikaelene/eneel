@@ -13,7 +13,8 @@ logger = logging.getLogger('main_logger')
 
 class Database:
     def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
-                 trusted_connection=None, as_columnstore=False, read_only=False, codepage=None):
+                 trusted_connection=None, as_columnstore=False, read_only=False, codepage=None,
+                 table_parallel_loads=10, table_parallel_batch_size=10000000):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
                           database + ";PORT=" + str(port)
@@ -35,6 +36,8 @@ class Database:
                 self._codepage = codepage
             else:
                 self._codepage = '1252'
+            self._table_parallel_loads = table_parallel_loads
+            self._table_parallel_batch_size = table_parallel_batch_size
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
@@ -197,10 +200,20 @@ class Database:
         except:
             logger.debug("Failed getting min and max column value")
 
-    def export_query(self, query, file_path, delimiter):
-        if self._read_only:
-            sys.exit("This source is readonly. Terminating load run")
+    def get_min_max_batch(self, table_name, column):
+        try:
+            sql = "SELECT MIN(" + column + "), MAX(" + column
+            sql += "), CEILING((max( " + column + ") - min("
+            sql += column + ")) / (count(*)/" + str(self._table_parallel_batch_size) + ".0)) FROM " + table_name
+            res = self.query(sql)
+            min_value = int(res[0][0])
+            max_value = int(res[0][1])
+            batch_size_key = int(res[0][2])
+            return min_value, max_value, batch_size_key
+        except:
+            logger.debug("Failed getting min, max and batch column value")
 
+    def export_query(self, query, file_path, delimiter):
         # Export data
         # Generate bcp command
         bcp_out = "bcp " + query + " queryout " + \
@@ -264,9 +277,9 @@ class Database:
 
             # Add logic for parallelization_key
             if parallelization_key:
-                min_parallelization_key, max_parallelization_key = self.get_min_max_column_value(schema + '.' + table,
-                                                                                                 parallelization_key)
-                batch_size = 1000000
+                min_parallelization_key, max_parallelization_key, batch_size_key = self.get_min_max_batch(
+                    schema + '.' + table,
+                    parallelization_key)
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
@@ -278,17 +291,21 @@ class Database:
                     file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
                     file_path = os.path.join(path, file_name)
                     batch_stmt = '"SELECT * FROM (' + select_stmt[1:-1] + ") q WHERE " + parallelization_key + ' between ' + str(
-                        batch_start) + ' and ' + str(batch_start + batch_size - 1) + '"'
+                        batch_start) + ' and ' + str(batch_start + batch_size_key - 1) + '"'
                     file_paths.append(file_path)
                     batch_stmts.append(batch_stmt)
                     delimiters.append(delimiter)
                     batch = (batch_stmt, file_path)
                     batches.append(batch)
-                    batch_start += batch_size
+                    batch_start += batch_size_key
                     batch_id += 1
 
+                table_workers = self._table_parallel_loads
+                if len(batch_stmts) < table_workers:
+                    table_workers = len(batch_stmts)
+
                 try:
-                    with Executor(max_workers=10) as executor:
+                    with Executor(max_workers=table_workers) as executor:
                         for row_count in executor.map(self.export_query, batch_stmts, file_paths, delimiters):
                             total_row_count += row_count
                 except Exception as exc:
@@ -401,16 +418,20 @@ class Database:
                 delimiters.append(delimiter)
                 codepages.append(codepage)
 
+            table_workers = self._table_parallel_loads
+            if len(file_paths) < table_workers:
+                table_workers = len(file_paths)
+
             total_row_counts = []
             return_codes = []
             try:
-                with Executor(max_workers=10) as executor:
+                with Executor(max_workers=table_workers) as executor:
                     for return_code, row_count in executor.map(self.import_file,
                                                   schemas, tables,  file_paths, delimiters, codepages):
                         return_codes.append(return_code)
                         total_row_counts.append(row_count)
             except Exception as exc:
-                logger.error(exc)
+                    logger.debug(exc)
 
             if 'ERROR' in return_codes:
                 return_code == 'ERROR'
