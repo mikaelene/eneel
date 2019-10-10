@@ -163,6 +163,7 @@ def run_load(project_load):
     # Temp path for specific load
     temp_path_schema = os.path.join(temp_path, source_schema)
     temp_path_load = os.path.join(temp_path_schema, source_table)
+    utils.delete_path(temp_path_load)
     utils.create_path(temp_path_load)
 
     # Source column types to exclude

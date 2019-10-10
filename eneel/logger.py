@@ -15,13 +15,6 @@ def get_logger(project='eneel'):
     stream_handler.setFormatter(logging.Formatter('%(message)s'))
     stream_handler.setLevel(logging.INFO)
 
-    #stream_log_format = '%(asctime)s - %(levelname)s - %(message)s'
-
-    #stream_handler = logging.StreamHandler()
-    #stream_handler.setLevel(logging.INFO)
-    #stream_formatter = logging.Formatter(stream_log_format)
-    #stream_handler.setFormatter(stream_formatter)
-
     logger.addHandler(stream_handler)
 
     # File handler
@@ -30,7 +23,7 @@ def get_logger(project='eneel'):
     log_filename = "logs/" + project + ".log"
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
 
-    file_handler = logging.FileHandler(log_filename)
+    file_handler = logging.FileHandler(log_filename, mode='w')
     file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter(file_log_format)
     file_handler.setFormatter(file_formatter)
