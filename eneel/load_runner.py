@@ -109,6 +109,210 @@ def run_project(project_name, connections_path=None, target=None):
         logdb.close()
 
 
+def export_table(return_code,
+                 index,
+                 total,
+                 source,
+                 source_schema,
+                 source_table,
+                 columns,
+                 temp_path_load,
+                 csv_delimiter,
+                 replication_key=None,
+                 max_replication_key=None,
+                 parallelization_key=None):
+    # Export table
+    try:
+        temp_path_load, delimiter, export_row_count = source.export_table(schema=source_schema,
+                                                                          table=source_table,
+                                                                          columns=columns,
+                                                                          path=temp_path_load,
+                                                                          delimiter=csv_delimiter,
+                                                                          replication_key=replication_key,
+                                                                          max_replication_key=max_replication_key,
+                                                                          parallelization_key=parallelization_key)
+    except:
+        return_code = 'ERROR'
+        full_source_table = source_schema + '.' + source_table
+        printer.print_load_line(index, total, return_code, full_source_table, msg="failed to export")
+    finally:
+        return return_code, temp_path_load, delimiter, export_row_count
+
+
+def create_temp_table(return_code, index, total, target, target_schema, target_table_tmp, columns, full_source_table):
+    try:
+        target.create_table_from_columns(target_schema, target_table_tmp, columns)
+        return_code = 'RUN'
+    except:
+        return_code = 'ERROR'
+        printer.print_load_line(index, total, return_code, full_source_table, msg="failed create temptable")
+    finally:
+        return return_code
+
+
+def import_into_temp_table(return_code, index, total, target, target_schema, target_table_tmp, temp_path_load,
+                           delimiter, full_source_table):
+    try:
+        return_code, import_row_count = target.import_table(target_schema, target_table_tmp, temp_path_load, delimiter)
+    except:
+        return_code = 'ERROR'
+        import_row_count = 0
+        printer.print_load_line(index, total, return_code, full_source_table, msg="failed import into temptable")
+    finally:
+        return return_code, import_row_count
+
+
+def switch_table(return_code, index, total, target, target_schema, target_table, target_table_tmp, full_source_table):
+    try:
+        target.switch_tables(target_schema, target_table, target_table_tmp)
+        return_code = 'RUN'
+    except:
+        return_code = 'ERROR'
+        printer.print_load_line(index, total, return_code, full_source_table, msg="failed switching temptable")
+    finally:
+        return return_code
+
+
+def insert_from_table_and_drop_tmp(return_code, index, total, target, target_schema, target_table, target_table_tmp,
+                                   full_source_table):
+    try:
+        target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
+        return_code = 'RUN'
+    except:
+        return_code = 'ERROR'
+        printer.print_load_line(index, total, "ERROR", full_source_table,  msg="failed import from temptable")
+    finally:
+        return return_code
+
+
+def strategy_full_table_load(return_code, index, total, source, source_schema, source_table, columns, temp_path_load,
+                             csv_delimiter, target, target_schema, target_table, parallelization_key):
+    export_row_count = None
+    import_row_count = None
+
+    try:
+        # Temp table
+        target_table_tmp = target_table + '_tmp'
+
+        # Full source table
+        full_source_table = source_schema + '.' + source_table
+
+        # Export table
+        return_code, temp_path_load, delimiter, export_row_count = export_table(return_code,
+                                                                                index,
+                                                                                total,
+                                                                                source,
+                                                                                source_schema,
+                                                                                source_table,
+                                                                                columns,
+                                                                                temp_path_load,
+                                                                                csv_delimiter,
+                                                                                replication_key=None,
+                                                                                max_replication_key=None,
+                                                                                parallelization_key=parallelization_key)
+
+        # Create temp table
+        return_code = create_temp_table(return_code, index, total, target, target_schema, target_table_tmp, columns,
+                                        full_source_table)
+
+        # Import into temp table
+        return_code, import_row_count = import_into_temp_table(return_code, index, total, target, target_schema,
+                                                               target_table_tmp, temp_path_load, delimiter,
+                                                               full_source_table)
+
+        # Switch tables
+        return_code = switch_table(return_code, index, total, target, target_schema, target_table, target_table_tmp,
+                                   full_source_table)
+
+        # Return success
+        if return_code == 'RUN':
+            return_code = 'DONE'
+
+    except:
+        printer.print_load_line(index, total, return_code, full_source_table, msg="load failed")
+    finally:
+        return return_code, export_row_count, import_row_count
+
+
+def strategy_incremental(return_code, index, total, source, source_schema, source_table, columns, temp_path_load,
+                         csv_delimiter, target, target_schema, target_table, replication_key=None,
+                         parallelization_key=None):
+    export_row_count = None
+    import_row_count = None
+
+    try:
+        # Temp table
+        target_table_tmp = target_table + '_tmp'
+
+        # Full table names
+        full_source_table = source_schema + '.' + source_table
+        full_target_table = target_schema + '.' + target_table
+
+        if not replication_key:
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication key not defined")
+            return return_code
+
+        if replication_key not in [column[1] for column in columns]:
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication key not found in table")
+            return return_code
+
+        # Get max replication key in target
+        if target.check_table_exist(full_target_table):
+            max_replication_key = target.get_max_column_value(full_target_table, replication_key)
+        else:
+            max_replication_key = None
+            printer.print_load_line(index, total, return_code, full_target_table,
+                                    msg="does not exist in target. Starts FULL_TABLE load")
+
+        # If no max replication key, do full load
+        if not max_replication_key:
+            return_code, export_row_count, import_row_count = strategy_full_table_load(return_code, index, total,
+                                                                                       source,
+                                                                                       source_schema, source_table,
+                                                                                       columns,
+                                                                                       temp_path_load,
+                                                                                       csv_delimiter,
+                                                                                       target, target_schema,
+                                                                                       target_table,
+                                                                                       parallelization_key=parallelization_key)
+
+        else:
+            # Export new rows
+            return_code, temp_path_load, delimiter, export_row_count = export_table(return_code,
+                                                                                    index,
+                                                                                    total,
+                                                                                    source,
+                                                                                    source_schema,
+                                                                                    source_table,
+                                                                                    columns,
+                                                                                    temp_path_load,
+                                                                                    csv_delimiter,
+                                                                                    replication_key=replication_key,
+                                                                                    max_replication_key=max_replication_key,
+                                                                                    parallelization_key=parallelization_key)
+
+            # Create temp table
+            return_code = create_temp_table(return_code, index, total, target, target_schema, target_table_tmp,
+                                            columns,
+                                            full_source_table)
+
+            # Import into temp table
+            return_code, import_row_count = import_into_temp_table(return_code, index, total, target, target_schema,
+                                                                   target_table_tmp, temp_path_load, delimiter,
+                                                                   full_source_table)
+
+            # Insert into and drop
+            return_code = insert_from_table_and_drop_tmp(return_code, index, total, target, target_schema,
+                                                        target_table, target_table_tmp, full_source_table)
+            # Return success
+            if return_code == 'RUN':
+                return_code = 'DONE'
+    except:
+        printer.print_load_line(index, total, return_code, full_source_table, msg="load failed")
+    finally:
+        return return_code, export_row_count, import_row_count
+
+
 def run_load(project_load):
     # Project and load info
     load_order = project_load.get('load_order')
@@ -163,9 +367,6 @@ def run_load(project_load):
         printer.print_load_line(index, total, "ERROR", full_source_table, msg="does not exist in source")
         return return_code
 
-    # Temp table
-    target_table_tmp = target_table + '_tmp'
-
     # Temp path for specific load
     temp_path_schema = os.path.join(temp_path, source_schema)
     temp_path_load = os.path.join(temp_path_schema, source_table)
@@ -194,145 +395,30 @@ def run_load(project_load):
     # Load type and settings
     replication_method = table.get('replication_method')
     parallelization_key = table.get('parallelization_key')
+    replication_key = table.get('replication_key')
+
+    index = load_order
+    total = num_tables_to_load
+    return_code = "START"
+    table_msg = full_source_table + " (" + replication_method + ")"
+    printer.print_load_line(index, total, return_code, table_msg)
 
     # Full table load
     if not replication_method or replication_method == "FULL_TABLE":
-        index = load_order
-        total = num_tables_to_load
-        return_code = "START"
-        table_msg = full_source_table + " (" + "FULL_TABLE" + ")"
-        printer.print_load_line(index, total, return_code, table_msg)
-
-        # Export table
-        try:
-            path, delimiter, export_row_count = source.export_table(schema=source_schema,
-                                                                    table=source_table,
-                                                                    columns=columns,
-                                                                    path=temp_path_load,
-                                                                    delimiter=csv_delimiter,
-                                                                    parallelization_key=parallelization_key)
-        except:
-            printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
-            return return_code
-
-        # Create temp table
-        try:
-            target.create_table_from_columns(target_schema, target_table_tmp, columns)
-        except:
-            printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
-            return return_code
-
-        # Import into temp table
-        try:
-            return_code, import_row_count = target.import_table(target_schema, target_table_tmp, path, delimiter)
-        except:
-            printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed import into temptable")
-            return return_code
-
-        # Switch tables
-        try:
-            target.switch_tables(target_schema, target_table, target_table_tmp)
-        except:
-            printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed switching temptable")
-            return return_code
+        return_code, export_row_count, import_row_count = strategy_full_table_load(return_code, index, total, source,
+                                                                                   source_schema, source_table, columns,
+                                                                                   temp_path_load, csv_delimiter,
+                                                                                   target, target_schema, target_table,
+                                                                                   parallelization_key=parallelization_key)
 
     # Incremental replication
     elif replication_method == "INCREMENTAL":
-        try:
-            index = load_order
-            total = num_tables_to_load
-            return_code = "START"
-            table_msg = full_source_table + " (" + replication_method + ")"
-            printer.print_load_line(index, total, return_code, table_msg)
-
-            replication_key = table.get('replication_key')
-            if not replication_key:
-                printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication key not defined")
-                return return_code
-
-            if replication_key not in [column[1] for column in columns]:
-                printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication key not found in table")
-                return return_code
-
-            # Get max replication key in target
-            if target.check_table_exist(full_target_table):
-                max_replication_key = target.get_max_column_value(full_target_table, replication_key)
-            else:
-                max_replication_key = None
-                printer.print_load_line(index, total, return_code, full_target_table,
-                                        msg="does not exist in target. Starts FULL_TABLE load")
-
-            # If no max replication key, do full load
-            if not max_replication_key:
-                # Export table
-                try:
-                    file, delimiter, export_row_count = source.export_table(source_schema, source_table, columns, temp_path_load,
-                                                          csv_delimiter)
-                except:
-                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
-                    return return_code
-
-                # Create temp table
-                try:
-                    target.create_table_from_columns(target_schema, target_table_tmp, columns)
-                except:
-                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
-                    return return_code
-
-                # Import into temp table
-                try:
-                    return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file,
-                                                                        delimiter)
-                except:
-                    printer.print_load_line(index, total, "ERROR", full_source_table,
-                                            msg="failed import into temptable")
-                    return return_code
-
-                # Switch tables
-                try:
-                    target.switch_tables(target_schema, target_table, target_table_tmp)
-                except:
-                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed switching temptable")
-                    return return_code
-
-            else:
-                # Export new rows
-                try:
-                    file, delimiter, export_row_count = source.export_table(source_schema, source_table, columns, temp_path_load, csv_delimiter,
-                                                          replication_key, max_replication_key)
-                except:
-                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
-                    return return_code
-
-                # Create temp table
-                try:
-                    target.create_table_from_columns(target_schema, target_table_tmp, columns)
-                except:
-                    printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
-                    return return_code
-
-                # Import into temp table
-                try:
-                    return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file,
-                                                                        delimiter)
-                except:
-                    printer.print_load_line(index, total, "ERROR", full_source_table,
-                                            msg="failed import into temptable")
-                    return return_code
-
-                # Insert into and drop
-                try:
-                    target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
-
-                except:
-                    printer.print_load_line(index, total, "ERROR", full_source_table,
-                                            msg="failed import from temptable")
-                    return return_code
-
-
-        except:
-            printer.print_load_line(index, total, "ERROR", full_source_table, msg="load failed")
-            return return_code
+        return_code, export_row_count, import_row_count = strategy_incremental(return_code, index, total, source,
+                                                                               source_schema, source_table, columns,
+                                                                               temp_path_load, csv_delimiter, target,
+                                                                               target_schema, target_table,
+                                                                               replication_key=replication_key,
+                                                                               parallelization_key=parallelization_key)
 
     else:
         printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication_method not valid")
