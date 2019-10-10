@@ -27,14 +27,17 @@ def run_project(project_name, connections_path=None, target=None):
 
     workers = project.workers
 
+    # Set number of workers
     if project.num_tables_to_load < workers:
         workers = project.num_tables_to_load
     start_msg = "Start loading " + str(project.num_tables_to_load) + " tables with " + str(workers) + " parallel workers"
     printer.print_output_line(start_msg)
 
+    # Job start time variable
     job_start_time = time()
     project_started_at = datetime.fromtimestamp(job_start_time)
 
+    # Set up logdb
     if project.logdb:
         try:
             logdb = config.connection_from_config(project.logdb['conninfo'])
@@ -58,10 +61,10 @@ def run_project(project_name, connections_path=None, target=None):
         for result in executor.map(run_load, project.loads):
             load_results.append(result)
 
+    # Parse result from parallel loads
     load_successes = 0
     load_warnings = 0
     load_errors = 0
-
     for load_result in load_results:
         if load_result == 'DONE':
             load_successes += 1
@@ -74,12 +77,12 @@ def run_project(project_name, connections_path=None, target=None):
     if not project.keep_tempfiles:
         utils.delete_path(project.temp_path)
 
+    # Project end logging
     job_end_time = time()
     project_ended_at = datetime.fromtimestamp(job_end_time)
     execution_time = job_end_time - job_start_time
     status_time = " in {execution_time:0.2f}s".format(
         execution_time=execution_time)
-
     end_msg = "Finished loading " + str(project.num_tables_to_load) + " tables in " + status_time + ": " + \
                                                             str(load_successes) + " successful, " + \
                                                             str(load_warnings) + " with warnings and " + \
@@ -107,9 +110,16 @@ def run_project(project_name, connections_path=None, target=None):
 
 
 def run_load(project_load):
+    # Project and load info
     load_order = project_load.get('load_order')
     num_tables_to_load = project_load.get('num_tables_to_load')
     project_name = project_load.get('project_name')
+    project_started_at = project_load.get('project_started_at')
+    project = project_load.get('project')
+    temp_path = project_load.get('temp_path')
+    schema = project_load.get('schema')
+    table = project_load.get('table')
+    # Connections info
     source_conninfo = project_load.get('source_conninfo')
     target_conninfo = project_load.get('target_conninfo')
     if project_load.get('logdb'):
@@ -118,16 +128,14 @@ def run_load(project_load):
         logdb_table = project_load.get('logdb')['table']
     else:
         logdb_conninfo = None
-    project_started_at = project_load.get('project_started_at')
-    project = project_load.get('project')
-    temp_path = project_load.get('temp_path')
-    schema = project_load.get('schema')
-    table = project_load.get('table')
 
+    # Set initial return code
     return_code = 'ERROR'
 
+    # Set load starttime
     load_start_time = time()
 
+    # Start logger. Seems to persist over load jobs when process are reused
     import eneel.logger as logger
     logger = logger.get_logger(project_name)
 
@@ -135,17 +143,14 @@ def run_load(project_load):
     for handler in logger.handlers[2:]:
         logger.removeHandler(handler)
 
+    # Connect to databases
     source = config.connection_from_config(source_conninfo)
     target = config.connection_from_config(target_conninfo)
 
-    # Delimiter
+    # Load details
     csv_delimiter = project.get('csv_delimiter')
-
-    # Schemas
     source_schema = schema.get('source_schema')
     target_schema = schema.get('target_schema')
-
-    # Tables
     source_table = table.get('table_name')
     full_source_table = source_schema + '.' + source_table
     target_table = schema.get('table_prefix', "") + table.get('table_name') + schema.get('table_suffix', "")
@@ -153,6 +158,7 @@ def run_load(project_load):
     index = load_order
     total = num_tables_to_load
 
+    # If source doesn't exist
     if not source.check_table_exist(full_source_table):
         printer.print_load_line(index, total, "ERROR", full_source_table, msg="does not exist in source")
         return return_code
@@ -185,11 +191,11 @@ def run_load(project_load):
         logger.error("Could not determine columns to load")
         return return_code
 
-    # Load type
+    # Load type and settings
     replication_method = table.get('replication_method')
     parallelization_key = table.get('parallelization_key')
-    #print(parallelization_key)
 
+    # Full table load
     if not replication_method or replication_method == "FULL_TABLE":
         index = load_order
         total = num_tables_to_load
@@ -204,33 +210,33 @@ def run_load(project_load):
                                                                     columns=columns,
                                                                     path=temp_path_load,
                                                                     delimiter=csv_delimiter,
-                                                                    #replication_key=None,
-                                                                    #max_replication_key=None,
                                                                     parallelization_key=parallelization_key)
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
             return return_code
+
+        # Create temp table
         try:
-            # Create temp table
             target.create_table_from_columns(target_schema, target_table_tmp, columns)
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
             return return_code
 
+        # Import into temp table
         try:
-            # Import into temp table
             return_code, import_row_count = target.import_table(target_schema, target_table_tmp, path, delimiter)
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed import into temptable")
             return return_code
 
+        # Switch tables
         try:
-            # Switch tables
             target.switch_tables(target_schema, target_table, target_table_tmp)
         except:
             printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed switching temptable")
             return return_code
 
+    # Incremental replication
     elif replication_method == "INCREMENTAL":
         try:
             index = load_order
@@ -248,6 +254,7 @@ def run_load(project_load):
                 printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication key not found in table")
                 return return_code
 
+            # Get max replication key in target
             if target.check_table_exist(full_target_table):
                 max_replication_key = target.get_max_column_value(full_target_table, replication_key)
             else:
@@ -255,6 +262,7 @@ def run_load(project_load):
                 printer.print_load_line(index, total, return_code, full_target_table,
                                         msg="does not exist in target. Starts FULL_TABLE load")
 
+            # If no max replication key, do full load
             if not max_replication_key:
                 # Export table
                 try:
@@ -263,15 +271,16 @@ def run_load(project_load):
                 except:
                     printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
                     return return_code
+
+                # Create temp table
                 try:
-                    # Create temp table
                     target.create_table_from_columns(target_schema, target_table_tmp, columns)
                 except:
                     printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
                     return return_code
 
+                # Import into temp table
                 try:
-                    # Import into temp table
                     return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file,
                                                                         delimiter)
                 except:
@@ -279,31 +288,31 @@ def run_load(project_load):
                                             msg="failed import into temptable")
                     return return_code
 
+                # Switch tables
                 try:
-                    # Switch tables
                     target.switch_tables(target_schema, target_table, target_table_tmp)
                 except:
                     printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed switching temptable")
                     return return_code
 
             else:
+                # Export new rows
                 try:
-                    # Export new rows
                     file, delimiter, export_row_count = source.export_table(source_schema, source_table, columns, temp_path_load, csv_delimiter,
                                                           replication_key, max_replication_key)
                 except:
                     printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed to export")
                     return return_code
 
+                # Create temp table
                 try:
-                    # Create temp table
                     target.create_table_from_columns(target_schema, target_table_tmp, columns)
                 except:
                     printer.print_load_line(index, total, "ERROR", full_source_table, msg="failed create temptable")
                     return return_code
 
+                # Import into temp table
                 try:
-                    # Import into temp table
                     return_code, import_row_count = target.import_table(target_schema, target_table_tmp, file,
                                                                         delimiter)
                 except:
@@ -311,8 +320,8 @@ def run_load(project_load):
                                             msg="failed import into temptable")
                     return return_code
 
+                # Insert into and drop
                 try:
-                    # Insert into and drop
                     target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
 
                 except:
@@ -337,6 +346,7 @@ def run_load(project_load):
     source.close()
     target.close()
 
+    # Load end, and execution time
     end_time = time()
     execution_time = end_time - load_start_time
 
@@ -357,6 +367,7 @@ def run_load(project_load):
                   status=return_code,
                   exported_rows=export_row_count,
                   imported_rows=import_row_count)
+        logdb.close()
 
     return return_code
 
