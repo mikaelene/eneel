@@ -16,8 +16,7 @@ def db():
         os.getenv('POSTGRES_TEST_PORT'))
 
     setup_sql = """
-    drop table if exists test.test1;
-    drop schema if exists test;
+    drop schema if exists test cascade;
     
     create schema test;
     

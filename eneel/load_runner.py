@@ -131,6 +131,7 @@ def export_table(return_code,
                                                                           replication_key=replication_key,
                                                                           max_replication_key=max_replication_key,
                                                                           parallelization_key=parallelization_key)
+        return_code = 'RUN'
     except:
         return_code = 'ERROR'
         full_source_table = source_schema + '.' + source_table
