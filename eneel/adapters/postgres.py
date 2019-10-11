@@ -343,8 +343,12 @@ class Database:
         try:
             self.execute("INSERT INTO " + to_schema_table + " SELECT * FROM  " + from_schema_table)
             self.execute("DROP TABLE " + from_schema_table)
+            return_code = 'RUN'
         except:
             logger.error("Failed to insert_from_table_and_drop")
+            return_code = 'ERROR'
+        finally:
+            return return_code
 
     def switch_tables(self, schema, old_table, new_table):
         if self._read_only:
@@ -364,8 +368,12 @@ class Database:
             else:
                 self.execute("ALTER TABLE " + new_schema_table + " RENAME TO " + old_table)
                 logger.debug("Renamed temp table")
+            return_code = 'RUN'
         except:
             logger.error("Failed to switch tables")
+            return_code = 'ERROR'
+        finally:
+            return return_code
 
     def import_table(self, schema, table, path, delimiter=','):
         if self._read_only:
@@ -404,7 +412,7 @@ class Database:
 
             #logger.info(row_count+ " records imported")
 
-            return "DONE", total_row_count
+            return 'RUN', total_row_count
 
         except:
             logger.error("Failed importing table")

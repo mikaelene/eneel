@@ -110,7 +110,7 @@ class TestDatabaseSqlserver:
 
         return_code, row_count = db.import_table('test_target', 'test1_target', file_path)
 
-        assert return_code == 'DONE'
+        assert return_code == 'RUN'
         assert row_count == 3
 
     def test_generate_create_table_ddl(self, db):

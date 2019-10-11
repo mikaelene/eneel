@@ -330,8 +330,12 @@ class Database:
         try:
             self.execute("INSERT INTO " + to_schema_table + " SELECT * FROM  " + from_schema_table)
             self.execute("DROP TABLE " + from_schema_table)
+            return_code = 'RUN'
         except:
             logger.error("Failed to insert_from_table_and_drop")
+            return_code = 'ERROR'
+        finally:
+            return return_code
 
     def switch_tables(self, schema, old_table, new_table):
         if self._read_only:
@@ -351,8 +355,12 @@ class Database:
             else:
                 self.execute("EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'")
                 logger.debug("Renamed temp table")
+            return_code = 'RUN'
         except:
             logger.error("Failed to switch tables")
+            return_code = 'ERROR'
+        finally:
+            return return_code
 
     def import_file(self, schema, table, file_path, delimiter, codepage):
         if self._read_only:
@@ -376,7 +384,7 @@ class Database:
                     return_message = cmd_message.splitlines()
                     try:
                         row_count = int(return_message[-3].split()[0])
-                        return_code = "DONE"
+                        return_code = 'RUN'
                     except:
                         if return_message[2].split()[0] == 'SQLState':
                             logger.debug(cmd_message)

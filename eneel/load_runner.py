@@ -177,8 +177,7 @@ def switch_table(return_code, index, total, target, target_schema, target_table,
 def insert_from_table_and_drop_tmp(return_code, index, total, target, target_schema, target_table, target_table_tmp,
                                    full_source_table):
     try:
-        target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
-        return_code = 'RUN'
+        return_code = target.insert_from_table_and_drop(target_schema, target_table, target_table_tmp)
     except:
         return_code = 'ERROR'
         printer.print_load_line(index, total, "ERROR", full_source_table,  msg="failed import from temptable")
@@ -394,7 +393,7 @@ def run_load(project_load):
         return return_code
 
     # Load type and settings
-    replication_method = table.get('replication_method')
+    replication_method = table.get('replication_method', 'FULL_TABLE')
     parallelization_key = table.get('parallelization_key')
     replication_key = table.get('replication_key')
 
