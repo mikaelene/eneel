@@ -4,8 +4,84 @@ import datetime
 import pytest
 
 from dotenv import find_dotenv, load_dotenv
-
 load_dotenv(find_dotenv())
+
+@pytest.fixture
+def run_project_fixture(tmp_path):
+    project_yml = """# Project info
+csv_delimiter: "|"
+parallel_loads: 2
+
+# Connection details
+source: db
+source_columntypes_to_exclude: timestamp, boolean
+target: db
+
+logdb: db
+logschema: test_logging
+logtable: run_log
+
+# Source to Destination Schema mapping
+schemas:
+  - source_schema: "run_project"                  # You can replicate from multiple schemas
+    target_schema: "run_project_tgt"           # Target schema
+    tables:                             # List Tables to replicate
+      - table_name: "test1"
+      """
+    project_yml_path = tmp_path / 'test_project.yml'
+    project_yml_path.write_text(project_yml)
+
+    connections_yml = """db:
+  type: postgres
+  outputs:
+    dev:
+"""
+    connections_yml += '      host: ' + os.getenv('POSTGRES_TEST_HOST') + '\n'
+    connections_yml += '      port: ' + os.getenv('POSTGRES_TEST_PORT') + '\n'
+    connections_yml += '      user: ' + os.getenv('POSTGRES_TEST_USER') + '\n'
+    connections_yml += '      password: ' + os.getenv('POSTGRES_TEST_PASS') + '\n'
+    connections_yml += '      database: ' + os.getenv('POSTGRES_TEST_DBNAME') + '\n'
+    connections_yml += '  target: dev'
+
+    connections_yml_path = tmp_path / 'connections.yml'
+    connections_yml_path.write_text(connections_yml)
+
+    db = Database(
+        os.getenv('POSTGRES_TEST_HOST'),
+        os.getenv('POSTGRES_TEST_USER'),
+        os.getenv('POSTGRES_TEST_PASS'),
+        os.getenv('POSTGRES_TEST_DBNAME'),
+        os.getenv('POSTGRES_TEST_PORT'))
+
+    setup_sql = """
+    drop schema if exists run_project cascade;
+
+    create schema run_project;
+
+    create table run_project.test1(
+    id_col 			int,
+    name_col		varchar(64),
+    datetime_col	timestamp
+    ); 
+
+    insert into run_project.test1 values(1, 'First', '2019-10-01 11:00:00');
+    insert into run_project.test1 values(2, 'Second', '2019-10-02 12:00:00');
+    insert into run_project.test1 values(3, 'Third', '2019-10-03 13:00:00');
+    """
+
+    db.execute(setup_sql)
+
+    db.create_log_table('test_logging', 'run_log')
+
+    yield db
+
+    teardown_sql = """
+            drop schema run_project CASCADE;
+            """
+    db.execute(teardown_sql)
+
+    db.close()
+
 
 @pytest.fixture
 def project_load(tmp_path):
@@ -36,7 +112,7 @@ def project_load(tmp_path):
 
     db.create_log_table('test_logging', 'run_log')
 
-    project_load = {'load_order': 1, 'num_tables_to_load': 2, 'project_name': 'test_project', 'source_conninfo': {'name': 'ource', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME'), 'table_parallel_loads': 10, 'table_parallel_batch_size': 500}}, 'target_conninfo': {'name': 'target', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME')}}, 'logdb': {'conninfo': {'name': 'logging', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME')}}, 'schema': 'test_logging', 'table': 'run_log'}, 'project': {'id': 'project id', 'name': 'Postgres to postgres', 'owner': 'somebody@yourcompany.com', 'temp_path': '/Users/mikaelene/Dev/eneel_projects/tempfiles', 'keep_tempfiles': False, 'csv_delimiter': '|', 'parallel_loads': 2, 'source': 'pg_source', 'source_columntypes_to_exclude': 'timestamp, boolean', 'target': 'pg_target', 'logdb': 'pg_logging', 'logtable': 'run_log'}, 'schema': {'source_schema': 'test_run_load', 'target_schema': 'test_run_load_target'}, 'table': {'table_name': 'test1', 'replication_method': 'FULL_TABLE', 'parallelization_key': 'id_col'}, 'temp_path': tmp_path, 'project_started_at': datetime.datetime(2019, 10, 11, 19, 31, 15, 809923)}
+    project_load = {'load_order': 1, 'num_tables_to_load': 2, 'project_name': 'test_project', 'source_conninfo': {'name': 'source', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME'), 'table_parallel_loads': 10, 'table_parallel_batch_size': 500}}, 'target_conninfo': {'name': 'target', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME')}}, 'logdb': {'conninfo': {'name': 'logging', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME')}}, 'schema': 'test_logging', 'table': 'run_log'}, 'project': {'id': 'project id', 'name': 'Postgres to postgres', 'owner': 'somebody@yourcompany.com', 'temp_path': '/Users/mikaelene/Dev/eneel_projects/tempfiles', 'keep_tempfiles': False, 'csv_delimiter': '|', 'parallel_loads': 2, 'source': 'pg_source', 'source_columntypes_to_exclude': 'timestamp, boolean', 'target': 'pg_target', 'logdb': 'pg_logging', 'logtable': 'run_log'}, 'schema': {'source_schema': 'test_run_load', 'target_schema': 'test_run_load_target'}, 'table': {'table_name': 'test1', 'replication_method': 'FULL_TABLE', 'parallelization_key': 'id_col'}, 'temp_path': tmp_path, 'project_started_at': datetime.datetime(2019, 10, 11, 19, 31, 15, 809923)}
 
     yield project_load
 
@@ -199,3 +275,13 @@ def test_run_load(project_load):
     return_code = run_load(project_load)
 
     assert return_code == 'DONE'
+
+
+def test_run_project(run_project_fixture, tmp_path):
+    connections_path = tmp_path / 'connections.yml'
+    run_dir = os.fspath(tmp_path)
+    os.chdir(run_dir)
+    run_project('test_project', connections_path)
+
+    assert run_project_fixture.check_table_exist('run_project_tgt.test1') is True
+
