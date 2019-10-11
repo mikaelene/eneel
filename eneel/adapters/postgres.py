@@ -481,6 +481,7 @@ class Database:
             logger.debug('Log table exist')
             return
 
+
         ddl = 'create table '
         ddl += full_table
         ddl += """(
