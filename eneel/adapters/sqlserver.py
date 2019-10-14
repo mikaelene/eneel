@@ -297,8 +297,8 @@ class Database:
                 while batch_start < max_parallelization_key:
                     file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
                     file_path = os.path.join(path, file_name)
-                    batch_stmt = '"SELECT * FROM (' + select_stmt[1:-1] + ") q WHERE " + parallelization_key + ' between ' + str(
-                        batch_start) + ' and ' + str(batch_start + batch_size_key - 1) + '"'
+                    batch_stmt = 'SELECT * FROM (' + select_stmt[1:-1] + ") q WHERE " + parallelization_key + ' between ' + str(
+                        batch_start) + ' and ' + str(batch_start + batch_size_key - 1)
                     file_paths.append(file_path)
                     batch_stmts.append(batch_stmt)
                     delimiters.append(delimiter)
