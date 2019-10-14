@@ -73,6 +73,10 @@ schemas:
 
     db.create_log_table('test_logging', 'run_log')
 
+    current_run_dir = os.getcwd()
+    run_dir = os.fspath(tmp_path)
+    os.chdir(run_dir)
+
     yield db
 
     teardown_sql = """
@@ -81,6 +85,8 @@ schemas:
     db.execute(teardown_sql)
 
     db.close()
+
+    os.chdir(current_run_dir)
 
 
 @pytest.fixture
@@ -114,6 +120,10 @@ def project_load(tmp_path):
 
     project_load = {'load_order': 1, 'num_tables_to_load': 2, 'project_name': 'test_project', 'source_conninfo': {'name': 'source', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME'), 'table_parallel_loads': 10, 'table_parallel_batch_size': 500}}, 'target_conninfo': {'name': 'target', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME')}}, 'logdb': {'conninfo': {'name': 'logging', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME')}}, 'schema': 'test_logging', 'table': 'run_log'}, 'project': {'id': 'project id', 'name': 'Postgres to postgres', 'owner': 'somebody@yourcompany.com', 'temp_path': '/Users/mikaelene/Dev/eneel_projects/tempfiles', 'keep_tempfiles': False, 'csv_delimiter': '|', 'parallel_loads': 2, 'source': 'pg_source', 'source_columntypes_to_exclude': 'timestamp, boolean', 'target': 'pg_target', 'logdb': 'pg_logging', 'logtable': 'run_log'}, 'schema': {'source_schema': 'test_run_load', 'target_schema': 'test_run_load_target'}, 'table': {'table_name': 'test1', 'replication_method': 'FULL_TABLE', 'parallelization_key': 'id_col'}, 'temp_path': tmp_path, 'project_started_at': datetime.datetime(2019, 10, 11, 19, 31, 15, 809923)}
 
+    current_run_dir = os.getcwd()
+    run_dir = os.fspath(tmp_path)
+    os.chdir(run_dir)
+
     yield project_load
 
     teardown_sql = """
@@ -123,6 +133,8 @@ def project_load(tmp_path):
     db.execute(teardown_sql)
 
     db.close()
+
+    os.chdir(current_run_dir)
 
 
 @pytest.fixture
@@ -279,8 +291,6 @@ def test_run_load(project_load):
 
 def test_run_project(run_project_fixture, tmp_path):
     connections_path = tmp_path / 'connections.yml'
-    run_dir = os.fspath(tmp_path)
-    os.chdir(run_dir)
     run_project('test_project', connections_path)
 
     assert run_project_fixture.check_table_exist('run_project_tgt.test1') is True
