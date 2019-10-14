@@ -16,7 +16,8 @@ def db():
         user=os.getenv('SQLSERVER_TEST_USER'),
         password=os.getenv('SQLSERVER_TEST_PASS'),
         port=os.getenv('SQLSERVER_TEST_PORT'),
-        trusted_connection=os.getenv('SQLSERVER_TEST_TRUSTED_CONNECTION'))
+        trusted_connection=os.getenv('SQLSERVER_TEST_TRUSTED_CONNECTION'),
+        codepage=os.getenv('SQLSERVER_TEST_CODEPAGE'))
 
     setup_sql1 = """
     drop table if exists test.test1;

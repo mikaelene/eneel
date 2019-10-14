@@ -216,12 +216,19 @@ class Database:
     def export_query(self, query, file_path, delimiter):
         # Export data
         # Generate bcp command
-        bcp_out = "bcp " + query + " queryout " + \
-                  file_path + " -t" + delimiter + " -c -C" + self._codepage + " -S" + self._server
+        bcp_out = ['bcp']
+        bcp_out.append(query)
+        bcp_out.append('queryout')
+        bcp_out.append(file_path)
+        bcp_out.append('-t' + delimiter)
+        bcp_out.append('-c')
+        bcp_out.append('-C' + self._codepage)
+        bcp_out.append('-S' + self._server)
         if self._trusted_connection:
-            bcp_out += " -T"
+            bcp_out.append('-T')
         else:
-            bcp_out += " -U" + self._user + " -P" + self._password
+            bcp_out.append('-U' + self._user)
+            bcp_out.append('-P' + self._password)
 
         logger.debug(bcp_out)
 
@@ -255,7 +262,7 @@ class Database:
                      parallelization_key=None):
         try:
             # Generate SQL statement for extract
-            select_stmt = '"SELECT '
+            select_stmt = 'SELECT '
 
             # Add limit
             if self._limit_rows:
@@ -272,7 +279,7 @@ class Database:
             # Add incremental where
             if replication_key:
                 select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
-            select_stmt += '"'
+            #select_stmt += '"'
             logger.debug(select_stmt)
 
             # Add logic for parallelization_key
@@ -290,8 +297,8 @@ class Database:
                 while batch_start < max_parallelization_key:
                     file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
                     file_path = os.path.join(path, file_name)
-                    batch_stmt = '"SELECT * FROM (' + select_stmt[1:-1] + ") q WHERE " + parallelization_key + ' between ' + str(
-                        batch_start) + ' and ' + str(batch_start + batch_size_key - 1) + '"'
+                    batch_stmt = 'SELECT * FROM (' + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(
+                        batch_start) + ' and ' + str(batch_start + batch_size_key - 1)
                     file_paths.append(file_path)
                     batch_stmts.append(batch_stmt)
                     delimiters.append(delimiter)
@@ -367,12 +374,20 @@ class Database:
             sys.exit("This source is readonly. Terminating load run")
         try:
             # Import data
-            bcp_in = "bcp [" + self._database + "].[" + schema + "].[" + table + "] in " + \
-                     file_path + " -t" + delimiter + " -c -C" + codepage + " -U -b100000 -S" + self._server
+            bcp_in = ['bcp']
+            bcp_in.append('[' + self._database + '].[' + schema + '].[' + table + ']')
+            bcp_in.append('in')
+            bcp_in.append(file_path)
+            bcp_in.append('-t' + delimiter)
+            bcp_in.append('-c')
+            bcp_in.append('-C' + self._codepage)
+            bcp_in.append('-b100000')
+            bcp_in.append('-S' + self._server)
             if self._trusted_connection:
-                bcp_in += " -T"
+                bcp_in.append('-T')
             else:
-                bcp_in += " -U" + self._user + " -P" + self._password
+                bcp_in.append('-U' + self._user)
+                bcp_in.append('-P' + self._password)
 
             logger.debug(bcp_in)
             cmd_code, cmd_message = utils.run_cmd(bcp_in)
@@ -399,7 +414,7 @@ class Database:
 
     def import_table(self, schema, table, path, delimiter=',', codepage='1252'):
         if self._read_only:
-            sys.exit("This source is readonly. Terminating load run")
+            sys.exit('This source is readonly. Terminating load run')
         try:
             schema_table = schema + '.' + table
             csv_files = glob(os.path.join(path, '*.csv'))

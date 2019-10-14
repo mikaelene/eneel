@@ -53,15 +53,13 @@ def load_file_contents(path, strip=True):
 
 
 def run_cmd(cmd):
-    res = subprocess.run(cmd,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, universal_newlines=True)
-    if res.returncode == 0:
+    try:
+        res = subprocess.run(cmd, text=True, capture_output=True,check=True)
         return res.returncode, res.stdout
-    elif res.stdout:
-        return res.returncode, res.stdout
-    else:
-        return res.returncode, res.stderr
+    except subprocess.CalledProcessError as error:
+        return error.returncode, error.stdout
+    except FileNotFoundError as error:
+        return 2, error
 
 
 
