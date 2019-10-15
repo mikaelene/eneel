@@ -1,6 +1,7 @@
 import logging
 import os
 import colorama
+import logging.handlers
 
 colorama.init()
 
@@ -23,7 +24,7 @@ def get_logger(project='eneel'):
     log_filename = "logs/" + project + ".log"
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
 
-    file_handler = logging.FileHandler(log_filename, mode='w')
+    file_handler = logging.handlers.RotatingFileHandler(log_filename, maxBytes=1000000, backupCount=2)
     file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter(file_log_format)
     file_handler.setFormatter(file_formatter)
