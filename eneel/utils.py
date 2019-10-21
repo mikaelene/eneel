@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import shutil
 import yaml
@@ -52,14 +53,27 @@ def load_file_contents(path, strip=True):
     return to_return
 
 
-def run_cmd(cmd):
+def run_cmd(cmd, envs=None):
     try:
-        res = subprocess.run(cmd, text=True, capture_output=True,check=True)
+        my_env = os.environ
+        if envs:
+            for env in envs:
+                my_env[env[0]] = env[1]
+        res = subprocess.run(cmd,
+                             text=True,
+                             capture_output=True,
+                             check=True,
+                             env=my_env,
+                             encoding='ISO-8859-2')
         return res.returncode, res.stdout
     except subprocess.CalledProcessError as error:
         return error.returncode, error.stdout
     except FileNotFoundError as error:
         return 2, error
+    except OSError as error:
+        return 8, error
+    except:
+        return -1, sys.exc_info()[0]
 
 
 

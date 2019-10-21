@@ -8,14 +8,15 @@ import logging
 logger = logging.getLogger('main_logger')
 
 
-def run_export_cmd(cmd_file):
-    cmd_code, cmd_message = utils.run_cmd(cmd_file)
+def run_export_cmd(cmd_commands):
+    envs = [['NLS_LANG', 'SWEDISH_SWEDEN.WE8ISO8859P1']]
+    cmd_code, cmd_message = utils.run_cmd(cmd_commands, envs)
     if cmd_code == 0:
-        logger.debug(cmd_file + " exported")
+        logger.debug(cmd_commands[2] + " exported")
         return 0
     else:
         logger.error(
-            "Error exportng " + cmd_file + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
+            "Error exportng " + cmd_commands[2] + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
         return 0
 
 
@@ -186,25 +187,35 @@ class Database:
             logger.debug("Failed getting min, max and batch column value")
 
     def generate_cmd_file(self, sql_file):
-        cmd = "SET NLS_LANG=SWEDISH_SWEDEN.WE8ISO8859P1\n"
-        cmd += "set NLS_NUMERIC_CHARACTERS=. \n"
-        cmd += "set NLS_TIMESTAMP_TZ_FORMAT=YYYY-MM-DD HH24:MI:SS.FF\n"
+        cmd = "export NLS_LANG=SWEDISH_SWEDEN.WE8ISO8859P1\n"
+        #cmd += "set NLS_NUMERIC_CHARACTERS=. \n"
+        #cmd += "set NLS_TIMESTAMP_TZ_FORMAT=YYYY-MM-DD HH24:MI:SS.FF\n"
         cmd += "sqlplus " + self._user + "/" + self._password + "@//" + self._server_db + " @" + sql_file
         logger.debug(cmd)
         return cmd
 
+    def generate_cmd_command(self, sql_file):
+        cmd = 'sqlplus'
+        ora_conn = self._user + "/" + self._password + "@//" + self._server_db
+        sqlfile = '@' + sql_file
+        cmd_to_run = [cmd, ora_conn, sqlfile]
+        return cmd_to_run
+
     def generate_spool_cmd(self, file_path, select_stmt):
-        spool_cmd = """set markup csv on quote off
-                    set term off
-                    set echo off
-                    set trimspool on 
-                    set trimout on
-                    set feedback off
-                    Set serveroutput off
-                    set heading off
-                    set arraysize 5000
-                    SET LONG 32767 
-                    spool """
+        spool_cmd = """
+alter session set NLS_NUMERIC_CHARACTERS = '. ';
+alter session set NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF';
+set markup csv on quote off
+set term off
+set echo off
+set trimspool on 
+set trimout on
+set feedback off
+Set serveroutput off
+set heading off
+set arraysize 5000
+SET LONG 32767 
+spool """
 
         spool_cmd += file_path + '\n'
         spool_cmd += select_stmt
@@ -261,11 +272,8 @@ class Database:
                 batch_id = 1
                 batch_start = min_parallelization_key
                 total_row_count = 0
-                #file_paths = []
-                #batch_stmts = []
-                #delimiters = []
-                #batches = []
                 cmds_files = []
+                cmds_commands = []
                 while batch_start < max_parallelization_key:
                     file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
                     file_path = os.path.join(path, file_name)
@@ -282,12 +290,10 @@ class Database:
                     with open(cmd_file, "w") as text_file:
                         text_file.write(cmd)
 
-                    #file_paths.append(file_path)
-                    #batch_stmts.append(batch_stmt)
-                    #delimiters.append(delimiter)
-                    #batch = (batch_stmt, file_path)
-                    #batches.append(batch)
                     cmds_files.append(cmd_file)
+
+                    cmd_commands = self.generate_cmd_command(sql_file)
+                    cmds_commands.append(cmd_commands)
                     batch_start += batch_size_key
                     batch_id += 1
 
@@ -297,7 +303,8 @@ class Database:
 
                 try:
                     with Executor(max_workers=table_workers) as executor:
-                        for row_count in executor.map(run_export_cmd, cmds_files):
+                        for row_count in executor.map(run_export_cmd, cmds_commands):
+                        #for row_count in executor.map(run_export_cmd, cmds_files):
                             total_row_count += row_count
                 except Exception as exc:
                     logger.error(exc)
@@ -320,8 +327,12 @@ class Database:
                 cmd_file = os.path.join(path, self._database + "_" + schema + "_" + table + ".cmd")
                 with open(cmd_file, "w") as text_file:
                     text_file.write(cmd)
+                    os.chmod(cmd_file, 0o0777)
 
-                total_row_count = run_export_cmd(cmd_file)
+                cmd_commands = self.generate_cmd_command(sql_file)
+
+                #total_row_count = run_export_cmd(cmd_file)
+                total_row_count = run_export_cmd(cmd_commands)
 
             return path, delimiter, None
         except:
