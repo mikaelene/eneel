@@ -254,7 +254,60 @@ spool """
 
         return select_stmt
 
+    def export_query(self, query, file_path, delimiter, rows=5000):
+        try:
+            export = self.cursor.execute(query)
+            rowcounts = 0
+            while rows:
+                try:
+                    rows = export.fetchmany(rows)
+                except:
+                    return rowcounts
+                rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+                rowcounts = rowcounts + rowcount
+        except Exception as e:
+            print(e)
+
     def export_table(self,
+                     schema,
+                     table,
+                     columns,
+                     path,
+                     delimiter=',',
+                     replication_key=None,
+                     max_replication_key=None,
+                     parallelization_key=None):
+
+        # Generate SQL statement for extract
+        select_stmt = "SELECT "
+
+        # Add columns
+        for col in columns:
+            column_name = col[1]
+            select_stmt += column_name + ", "
+        select_stmt = select_stmt[:-2]
+
+        select_stmt += " FROM " + schema + '.' + table
+
+        # Add incremental where
+        if replication_key:
+            select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
+
+        # Add limit
+        if self._limit_rows:
+            select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
+        logger.debug(select_stmt)
+
+        # Generate file name
+        file_name = self._database + '_' + schema + '_' + table + '.csv'
+        file_path = os.path.join(path, file_name)
+
+        total_row_count = self.export_query(select_stmt, file_path, delimiter)
+
+        return path, delimiter, total_row_count
+
+
+    def export_table_old(self,
                      schema,
                      table,
                      columns,

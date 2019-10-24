@@ -6,6 +6,7 @@ from time import time
 from datetime import datetime
 from glob import glob
 from concurrent.futures import ThreadPoolExecutor as Executor
+import eneel.utils as utils
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -213,7 +214,21 @@ class Database:
         except:
             logger.debug("Failed getting min, max and batch column value")
 
-    def export_query(self, query, file_path, delimiter):
+    def export_query(self, query, file_path, delimiter, rows=5000):
+        try:
+            export = self.cursor.execute(query)
+            rowcounts = 0
+            while rows:
+                try:
+                    rows = export.fetchmany(rows)
+                except:
+                    return rowcounts
+                rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+                rowcounts = rowcounts + rowcount
+        except Exception as e:
+            print(e)
+
+    def export_query_old(self, query, file_path, delimiter):
         # Export data
         # Generate bcp command
         bcp_out = ['bcp']
@@ -396,6 +411,9 @@ class Database:
 
             if cmd_code == 0:
                 try:
+                    errors = cmd_message.count('Error')
+                    if errors > 0:
+                        logger.error('Importing in ' + schema + "." + table + ' completed with errors')
                     return_message = cmd_message.splitlines()
                     try:
                         row_count = int(return_message[-3].split()[0])

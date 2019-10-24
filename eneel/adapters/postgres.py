@@ -431,6 +431,8 @@ class Database:
                 numeric_scale = col[5]
 
                 column = column_name + " " + data_type
+                if "varchar2" in data_type:
+                    column = column_name + " " + "varchar"
                 if "char" in data_type:
                     column += "("
                     if character_maximum_length == -1:
@@ -440,6 +442,8 @@ class Database:
                     column += ")"
                 elif "numeric" in data_type:
                     column += "(" + str(numeric_precision) + "," + str(numeric_scale) + ")"
+                elif "number" in data_type:
+                    column = column_name + " " + "numeric"
                 elif data_type == "USER-DEFINED":
                     column = column_name + " TEXT"
                 elif data_type == "ARRAY":
