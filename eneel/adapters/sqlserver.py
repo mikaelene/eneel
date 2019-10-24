@@ -17,6 +17,7 @@ def run_export_query(driver, server, database, port, user, password, trusted_con
     try:
         db = Database(driver, server, database, port, limit_rows=None, user=user, password=password,
                       trusted_connection=trusted_connection)
+        print(db)
         export = db.cursor.execute(query)
         rowcounts = 0
         while rows:
@@ -34,7 +35,7 @@ def run_export_query(driver, server, database, port, user, password, trusted_con
 class Database:
     def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
                  trusted_connection=None, as_columnstore=False, read_only=False, codepage=None,
-                 table_parallel_loads=10, table_parallel_batch_size=10000000):
+                 table_parallel_loads=10, table_parallel_batch_size=10000000, table_where_clause=None):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
                           database + ";PORT=" + str(port)
@@ -58,6 +59,7 @@ class Database:
                 self._codepage = '1252'
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
+            self._table_where_clause = table_where_clause
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
@@ -235,6 +237,7 @@ class Database:
 
     def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
                               parallelization_where=None):
+        print('generate_export_query')
         # Generate SQL statement for extract
         select_stmt = 'SELECT '
 
@@ -262,11 +265,10 @@ class Database:
             select_stmt += " WHERE " + wheres[0]
             for where in wheres[1:]:
                 select_stmt += " AND " + where
-
         return select_stmt
 
-
     def export_query(self, query, file_path, delimiter, rows=5000):
+        print('export_query')
         try:
             export = self.cursor.execute(query)
             rowcounts = 0
@@ -461,10 +463,14 @@ class Database:
             return_code = 'ERROR'
             row_count = 0
 
+            print(cmd_message)
+
             if cmd_code == 0:
                 try:
                     errors = cmd_message.count('Error')
+                    print(errors)
                     if errors > 0:
+                        print('logger error')
                         logger.error('Importing in ' + schema + "." + table + ' completed with errors')
                     return_message = cmd_message.splitlines()
                     try:

@@ -122,6 +122,7 @@ def export_table(return_code,
                  max_replication_key=None,
                  parallelization_key=None):
     # Export table
+    print('e')
     try:
         if parallelization_key:
             min_parallelization_key, max_parallelization_key, batch_size_key = source.get_min_max_batch(
