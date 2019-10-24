@@ -51,7 +51,7 @@ def connection_from_config(connection_info):
         return sqlserver.Database(odbc_driver, server, database, port, limit_rows, user, password, trusted_connection,
                                   as_columnstore, read_only, codepage, table_parallel_loads, table_parallel_batch_size)
     elif connection_info.get('type') == 'postgres':
-        return postgres.Database(server, user, password, database, port, limit_rows, read_only, table_parallel_loads, table_parallel_batch_size)
+        return postgres.Database(server, user, password, database, port, limit_rows, table_where_clause, read_only, table_parallel_loads, table_parallel_batch_size)
     else:
         logger.error('source type not found')
 

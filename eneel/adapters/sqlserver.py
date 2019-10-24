@@ -12,6 +12,25 @@ import logging
 logger = logging.getLogger('main_logger')
 
 
+def run_export_query(driver, server, database, port, user, password, trusted_connection, query,  file_path, delimiter,
+                     rows=5000):
+    try:
+        db = Database(driver, server, database, port, limit_rows=None, user=user, password=password,
+                      trusted_connection=trusted_connection)
+        export = db.cursor.execute(query)
+        rowcounts = 0
+        while rows:
+            try:
+                rows = export.fetchmany(rows)
+            except:
+                return rowcounts
+            rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+            rowcounts = rowcounts + rowcount
+        return rowcounts
+        db.close()
+    except Exception as e:
+        logger.error(e)
+
 class Database:
     def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
                  trusted_connection=None, as_columnstore=False, read_only=False, codepage=None,
@@ -213,6 +232,39 @@ class Database:
             return min_value, max_value, batch_size_key
         except:
             logger.debug("Failed getting min, max and batch column value")
+
+    def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
+                              parallelization_where=None):
+        # Generate SQL statement for extract
+        select_stmt = 'SELECT '
+
+        # Add limit
+        if self._limit_rows:
+            select_stmt += 'TOP ' + str(self._limit_rows) + ' '
+
+        # Add columns
+        for col in columns:
+            column_name = "[" + col[1] + "]"
+            select_stmt += column_name + ", "
+        select_stmt = select_stmt[:-2]
+
+        select_stmt += ' FROM [' + self._database + '].[' + schema + '].[' + table + ']' + ' WITH (NOLOCK)'
+
+        # Where-claues for incremental replication
+        if replication_key:
+            replication_where = replication_key + " > " + "'" + max_replication_key + "'"
+        else:
+            replication_where = None
+
+        wheres = replication_where, self._table_where_clause, parallelization_where
+        wheres = [x for x in wheres if x is not None]
+        if len(wheres) > 0:
+            select_stmt += " WHERE " + wheres[0]
+            for where in wheres[1:]:
+                select_stmt += " AND " + where
+
+        return select_stmt
+
 
     def export_query(self, query, file_path, delimiter, rows=5000):
         try:

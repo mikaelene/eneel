@@ -5,6 +5,8 @@ import psycopg2.extras
 from time import time
 from datetime import datetime
 from glob import glob
+import eneel.utils as utils
+
 from concurrent.futures import ProcessPoolExecutor as Executor
 
 import logging
@@ -43,9 +45,28 @@ def parallelized_import(server, user, password, database, port,
         db.close()
 
 
+def run_export_query(server, user, password, database, port, query, file_path, delimiter, rows=5000):
+    print('batch')
+    try:
+        db = Database(server, user, password, database, port)
+        db.cursor.execute(query)
+        rowcounts = 0
+        while rows:
+            try:
+                rows = db.cursor.fetchmany(rows)
+            except:
+                return rowcounts
+            rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+            rowcounts = rowcounts + rowcount
+        return rowcounts
+        db.close()
+    except Exception as e:
+        logger.error(e)
+
+
 class Database:
-    def __init__(self, server, user, password, database, port=5432, limit_rows=None, read_only=False,
-                 table_parallel_loads=10, table_parallel_batch_size=10000000):
+    def __init__(self, server, user, password, database, port=5432, limit_rows=None, table_where_clause=None,
+                 read_only=False, table_parallel_loads=10, table_parallel_batch_size=10000000):
         try:
             conn_string = "host=" + server + " dbname=" + \
                           database + " user=" + user + " password=" + password
@@ -56,6 +77,7 @@ class Database:
             self._port = port
             self._dialect = "postgres"
             self._limit_rows = limit_rows
+            self._table_where_clause = table_where_clause
             self._read_only = read_only
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
@@ -232,7 +254,44 @@ class Database:
         except:
             logger.debug("Failed getting min, max and batch column value")
 
-    def export_query(self, query, file_path, delimiter):
+    def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
+                              parallelization_where=None):
+
+        # Generate SQL statement for extract
+        select_stmt = "SELECT "
+        # Add columns
+        for col in columns:
+            column_name = col[1]
+            select_stmt += column_name + ", "
+        select_stmt = select_stmt[:-2]
+
+        select_stmt += ' FROM ' + schema + "." + table
+
+        # Where-claues for incremental replication
+        if replication_key:
+            replication_where = replication_key + " > " + "'" + max_replication_key + "'"
+        else:
+            replication_where = None
+
+        wheres = replication_where, self._table_where_clause, parallelization_where
+        wheres = [x for x in wheres if x is not None]
+        if len(wheres) > 0:
+            select_stmt += " WHERE " + wheres[0]
+            for where in wheres[1:]:
+                select_stmt += " AND " + where
+
+        if self._limit_rows:
+            select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
+
+        return select_stmt
+
+    def export_query(self, query, file_path, delimiter, rows=5000):
+        rowcounts = run_export_query(self._server, self._user, self._password, self._database, self._port, query, file_path,
+                         delimiter, rows=5000)
+        return rowcounts
+
+
+    def export_query_old(self, query, file_path, delimiter):
         # Create and run the cmd
         sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
         file = open(file_path, "w")

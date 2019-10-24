@@ -126,14 +126,12 @@ def export_table(return_code,
         if parallelization_key:
             min_parallelization_key, max_parallelization_key, batch_size_key = source.get_min_max_batch(
                 source_schema + '.' + source_table, parallelization_key)
-            print(min_parallelization_key, max_parallelization_key, batch_size_key)
             batch_id = 1
             batch_start = min_parallelization_key
             total_row_count = 0
             file_paths = []
             querys = []
             csv_delimiters = []
-            #batches = []
 
             while batch_start <= max_parallelization_key:
                 file_name = source._database + "_" + source_schema + "_" + source_table + "_" + str(batch_id) + ".csv"
@@ -142,7 +140,6 @@ def export_table(return_code,
                 #parallelization_where = source.get_parallelization_where(batch_start, batch_size_key)
                 parallelization_where = parallelization_key + ' between ' + str(batch_start) + ' and ' + \
                                         str(batch_start + batch_size_key - 1)
-                print(parallelization_where)
                 query = source.generate_export_query(columns, source_schema, source_table,
                                                         replication_key, max_replication_key, parallelization_where)
 
@@ -152,7 +149,6 @@ def export_table(return_code,
 
                 batch_start += batch_size_key
                 batch_id += 1
-                print(batch_start, max_parallelization_key)
 
             table_workers = source._table_parallel_loads
             if len(querys) < table_workers:
@@ -162,9 +158,8 @@ def export_table(return_code,
                 with Executor(max_workers=table_workers) as executor:
                     for row_count in executor.map(source.export_query, querys, file_paths, csv_delimiters):
                         total_row_count += row_count
-                        print("batch done")
             except Exception as exc:
-                print(exc)
+                logger.error(exc)
 
         else:
 
