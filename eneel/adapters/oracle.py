@@ -22,7 +22,7 @@ def run_export_cmd(cmd_commands):
 
 class Database:
     def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None, read_only=False,
-                 table_parallel_loads=10, table_parallel_batch_size=10000000):
+                 table_parallel_loads=10, table_parallel_batch_size=1000000):
         try:
             server_db = '{}:{}/{}'.format(server, port, database)
             self._server = server
@@ -179,6 +179,7 @@ class Database:
             sql += "), ceil((max( " + column + ") - min("
             sql += column + ")) / (count(*)/" + str(self._table_parallel_batch_size) + ".0)) FROM " + table_name
             res = self.query(sql)
+            print(sql)
             min_value = int(res[0][0])
             max_value = int(res[0][1])
             batch_size_key = int(res[0][2])
@@ -254,6 +255,38 @@ spool """
 
         return select_stmt
 
+    def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
+                              parallelization_where=None):
+        # Generate SQL statement for extract
+        select_stmt = "SELECT "
+        # Add columns
+        for col in columns:
+            column_name = col[1]
+            select_stmt += column_name + ", "
+        select_stmt = select_stmt[:-2]
+
+        select_stmt += ' FROM ' + schema + "." + table
+
+        # Where-claues for incremental replication
+        if replication_key:
+            replication_where = replication_key + " > " + "'" + max_replication_key + "'"
+        else:
+            replication_where = None
+
+        wheres = replication_where, self._table_where_clause, parallelization_where
+        wheres = [x for x in wheres if x is not None]
+        if len(wheres) > 0:
+            select_stmt += " WHERE " + wheres[0]
+            for where in wheres[1:]:
+                select_stmt += " AND " + where
+
+        if self._limit_rows:
+            select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
+
+        #select_stmt += ";"
+
+        return select_stmt
+
     def export_query(self, query, file_path, delimiter, rows=5000):
         try:
             export = self.cursor.execute(query)
@@ -266,7 +299,7 @@ spool """
                 rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
                 rowcounts = rowcounts + rowcount
         except Exception as e:
-            print(e)
+            logger.error(e)
 
     def export_table(self,
                      schema,

@@ -1,5 +1,5 @@
 import eneel.utils as utils
-from concurrent.futures import ProcessPoolExecutor as Executor
+from concurrent.futures import ThreadPoolExecutor as Executor
 import os
 import eneel.printer as printer
 from time import time
@@ -123,21 +123,66 @@ def export_table(return_code,
                  parallelization_key=None):
     # Export table
     try:
-        temp_path_load, delimiter, export_row_count = source.export_table(schema=source_schema,
-                                                                          table=source_table,
-                                                                          columns=columns,
-                                                                          path=temp_path_load,
-                                                                          delimiter=csv_delimiter,
-                                                                          replication_key=replication_key,
-                                                                          max_replication_key=max_replication_key,
-                                                                          parallelization_key=parallelization_key)
+        if parallelization_key:
+            min_parallelization_key, max_parallelization_key, batch_size_key = source.get_min_max_batch(
+                source_schema + '.' + source_table, parallelization_key)
+            print(min_parallelization_key, max_parallelization_key, batch_size_key)
+            batch_id = 1
+            batch_start = min_parallelization_key
+            total_row_count = 0
+            file_paths = []
+            querys = []
+            csv_delimiters = []
+            #batches = []
+
+            while batch_start <= max_parallelization_key:
+                file_name = source._database + "_" + source_schema + "_" + source_table + "_" + str(batch_id) + ".csv"
+                file_path = os.path.join(temp_path_load, file_name)
+
+                #parallelization_where = source.get_parallelization_where(batch_start, batch_size_key)
+                parallelization_where = parallelization_key + ' between ' + str(batch_start) + ' and ' + \
+                                        str(batch_start + batch_size_key - 1)
+                print(parallelization_where)
+                query = source.generate_export_query(columns, source_schema, source_table,
+                                                        replication_key, max_replication_key, parallelization_where)
+
+                file_paths.append(file_path)
+                querys.append(query)
+                csv_delimiters.append(csv_delimiter)
+
+                batch_start += batch_size_key
+                batch_id += 1
+                print(batch_start, max_parallelization_key)
+
+            table_workers = source._table_parallel_loads
+            if len(querys) < table_workers:
+                table_workers = len(querys)
+
+            try:
+                with Executor(max_workers=table_workers) as executor:
+                    for row_count in executor.map(source.export_query, querys, file_paths, csv_delimiters):
+                        total_row_count += row_count
+                        print("batch done")
+            except Exception as exc:
+                print(exc)
+
+        else:
+
+            file_name = source._database + "_" + source_schema + "_" + source_table + "_" + ".csv"
+            file_path = os.path.join(temp_path_load, file_name)
+
+            query = source.generate_export_query(columns, source_schema, source_table,
+                                                    replication_key, max_replication_key)
+
+            total_row_count = source.export_query(query, file_path, csv_delimiter)
+
         return_code = 'RUN'
     except:
         return_code = 'ERROR'
         full_source_table = source_schema + '.' + source_table
         printer.print_load_line(index, total, return_code, full_source_table, msg="failed to export")
     finally:
-        return return_code, temp_path_load, delimiter, export_row_count
+        return return_code, temp_path_load, csv_delimiter, total_row_count
 
 
 def create_temp_table(return_code, index, total, target, target_schema, target_table_tmp, columns, full_source_table):

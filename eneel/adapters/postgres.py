@@ -172,7 +172,7 @@ class Database:
             SELECT 1
             FROM   information_schema.tables 
             WHERE  table_schema || '.' || table_name = '"""
-            check_statement += table_name + "')"
+            check_statement += table_name.lower() + "')"
             exists = self.query(check_statement)
             return exists[0][0]
         except:
