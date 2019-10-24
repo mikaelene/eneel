@@ -352,7 +352,7 @@ def run_load(project_load):
     target = config.connection_from_config(target_conninfo)
 
     # Load details
-    csv_delimiter = project.get('csv_delimiter')
+    csv_delimiter = project.get('csv_delimiter', '|')
     source_schema = schema.get('source_schema')
     target_schema = schema.get('target_schema')
     source_table = table.get('table_name')
