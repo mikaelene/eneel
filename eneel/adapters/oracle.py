@@ -19,6 +19,22 @@ def run_export_cmd(cmd_commands):
             "Error exportng " + cmd_commands[2] + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
         return 0
 
+def run_export_query(server, user, password, database, port, query, file_path, delimiter, rows=5000):
+    print('loading')
+    try:
+        db = Database(server, user, password, database, port)
+        export = db.cursor.execute(query)
+        rowcounts = 0
+        while rows:
+            try:
+                rows = export.fetchmany(rows)
+            except:
+                return rowcounts
+            rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+            rowcounts = rowcounts + rowcount
+    except Exception as e:
+        logger.error(e)
+
 
 class Database:
     def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None, read_only=False,
@@ -29,6 +45,7 @@ class Database:
             self._user = user
             self._password = password
             self._database = database
+            self._port = port
             self._server_db = server_db
             self._dialect = "oracle"
             self._limit_rows = limit_rows
@@ -288,18 +305,20 @@ spool """
         return select_stmt
 
     def export_query(self, query, file_path, delimiter, rows=5000):
-        try:
-            export = self.cursor.execute(query)
-            rowcounts = 0
-            while rows:
-                try:
-                    rows = export.fetchmany(rows)
-                except:
-                    return rowcounts
-                rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
-                rowcounts = rowcounts + rowcount
-        except Exception as e:
-            logger.error(e)
+        rowcounts = run_export_query(self._server, self._user, self._password, self._database, self._port, query, file_path,
+                         delimiter, rows=5000)
+    #    try:
+    #        export = self.cursor.execute(query)
+    #        rowcounts = 0
+    #        while rows:
+    #            try:
+    #                rows = export.fetchmany(rows)
+    #            except:
+    #                return rowcounts
+    #            rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+    #            rowcounts = rowcounts + rowcount
+    #    except Exception as e:
+    #        logger.error(e)
 
     def export_table(self,
                      schema,
