@@ -17,7 +17,6 @@ def run_export_query(driver, server, database, port, user, password, trusted_con
     try:
         db = Database(driver, server, database, port, limit_rows=None, user=user, password=password,
                       trusted_connection=trusted_connection)
-        print(db)
         export = db.cursor.execute(query)
         rowcounts = 0
         while rows:

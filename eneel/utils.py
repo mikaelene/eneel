@@ -83,7 +83,7 @@ def export_csv(rows, filename, delimiter='|'):
         # threadName=threading.current_thread().name
         csv_file = open(filename, "a")
         writer = csv.writer(csv_file, dialect=csv.excel, delimiter=delimiter, lineterminator="\n",
-                            quoting=csv.QUOTE_NONNUMERIC)
+                            quoting=csv.QUOTE_NONE)
         #logger.info("File:-" + filename + " Started")
         writer.writerows(rows)
         csv_file.close()
