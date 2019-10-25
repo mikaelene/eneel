@@ -236,7 +236,6 @@ class Database:
 
     def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
                               parallelization_where=None):
-        print('generate_export_query')
         # Generate SQL statement for extract
         select_stmt = 'SELECT '
 
@@ -267,7 +266,6 @@ class Database:
         return select_stmt
 
     def export_query(self, query, file_path, delimiter, rows=5000):
-        print('export_query')
         try:
             export = self.cursor.execute(query)
             rowcounts = 0
@@ -279,7 +277,7 @@ class Database:
                 rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
                 rowcounts = rowcounts + rowcount
         except Exception as e:
-            print(e)
+            logger.error(e)
 
     def export_query_old(self, query, file_path, delimiter):
         # Export data
@@ -462,14 +460,10 @@ class Database:
             return_code = 'ERROR'
             row_count = 0
 
-            print(cmd_message)
-
             if cmd_code == 0:
                 try:
                     errors = cmd_message.count('Error')
-                    print(errors)
                     if errors > 0:
-                        print('logger error')
                         logger.error('Importing in ' + schema + "." + table + ' completed with errors')
                     return_message = cmd_message.splitlines()
                     try:

@@ -1,6 +1,8 @@
 import cx_Oracle
 import sys
 import eneel.utils as utils
+import decimal
+import os
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -24,6 +26,13 @@ def run_export_query(server, user, password, database, port, query, file_path, d
         logger.error(e)
 
 
+def NumbersAsDecimal(cursor, name, defaultType, size, precision,
+        scale):
+    if defaultType == cx_Oracle.NUMBER:
+        return cursor.var(str, 100, cursor.arraysize,
+                outconverter = decimal.Decimal)
+
+
 class Database:
     def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None,
                  read_only=False, table_parallel_loads=10, table_parallel_batch_size=1000000):
@@ -42,7 +51,12 @@ class Database:
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
 
+            os.environ['NLS_LANG'] = 'AMERICAN_AMERICA.WE8ISO8859P1'
+            #os.environ['NLS_LANG'] = 'SWEDISH_SWEDEN.WE8ISO8859P1'
             self._conn = cx_Oracle.connect(user, password, server_db)
+
+            self._conn.outputtypehandler = NumbersAsDecimal
+
             self._cursor = self._conn.cursor()
             logger.debug("Connection to oracle successful")
         except cx_Oracle.Error as e:
