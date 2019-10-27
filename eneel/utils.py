@@ -80,12 +80,16 @@ def run_cmd(cmd, envs=None):
 
 def export_csv(rows, filename, delimiter='|'):
     try:
-        # threadName=threading.current_thread().name
         csv_file = open(filename, "a")
-        writer = csv.writer(csv_file, dialect=csv.excel, delimiter=delimiter, lineterminator="\n",
-                            quoting=csv.QUOTE_NONE)
-        #logger.info("File:-" + filename + " Started")
-        writer.writerows(rows)
+        for row in rows:
+            csv_row = ''
+            for i in range(len(row)):
+                if i < len(row)-1:
+                    col = str(row[i]) + delimiter
+                else:
+                    col = str(row[i])
+                csv_row += col
+            csv_file.write(csv_row + '\n')
         csv_file.close()
         rowcount = len(rows)
         #logger.info(str(rowcount) + " rows added to " + filename)
