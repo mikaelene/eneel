@@ -29,8 +29,8 @@ def parallelized_export(server, user, password, database, port,
         db.close()
 
 
-def parallelized_import(server, user, password, database, port,
-                        schema_table, file_path, delimiter):
+def run_import_file(server, user, password, database, port,
+                    schema_table, file_path, delimiter):
     db = Database(server, user, password, database, port)
     # Create and run the cmd
     sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
@@ -332,9 +332,11 @@ class Database:
             return return_code
 
     def import_file(self, schema, table, path, delimiter=','):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
         schema_table = schema + '.' + table
-        row_count = parallelized_import(self._server, self._user, self._password, self._database, self._port,
-                                        schema_table, path, delimiter)
+        row_count = run_import_file(self._server, self._user, self._password, self._database, self._port,
+                                    schema_table, path, delimiter)
         return row_count
 
 
@@ -366,7 +368,7 @@ class Database:
 
             try:
                 with Executor(max_workers=self._table_parallel_loads) as executor:
-                    for row_count in executor.map(parallelized_import,
+                    for row_count in executor.map(run_import_file,
                                                   servers, users, passwords, databases, ports,
                                                   schema_tables, file_paths, delimiters):
                         total_row_count += row_count

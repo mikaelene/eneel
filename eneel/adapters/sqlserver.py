@@ -12,6 +12,54 @@ import logging
 logger = logging.getLogger('main_logger')
 
 
+def run_import_file(server, database, user, password, trusted_connection, codepage, schema, table, file_path,
+                delimiter):
+
+    try:
+        # Import data
+        bcp_in = ['bcp']
+        bcp_in.append('[' + database + '].[' + schema + '].[' + table + ']')
+        bcp_in.append('in')
+        bcp_in.append(file_path)
+        bcp_in.append('-t' + delimiter)
+        bcp_in.append('-c')
+        bcp_in.append('-C' + codepage)
+        bcp_in.append('-b100000')
+        bcp_in.append('-S' + server)
+        if trusted_connection:
+            bcp_in.append('-T')
+        else:
+            bcp_in.append('-U' + user)
+            bcp_in.append('-P' + password)
+
+        logger.debug(bcp_in)
+        cmd_code, cmd_message = utils.run_cmd(bcp_in)
+        return_code = 'ERROR'
+        row_count = 0
+
+        if cmd_code == 0:
+            try:
+                errors = cmd_message.count('Error')
+                if errors > 0:
+                    logger.error('Importing in ' + schema + "." + table + ' completed with errors')
+                return_message = cmd_message.splitlines()
+                try:
+                    row_count = int(return_message[-3].split()[0])
+                    return_code = 'RUN'
+                except:
+                    if return_message[2].split()[0] == 'SQLState':
+                        logger.debug(cmd_message)
+                        return_code = "WARN"
+            except:
+                logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
+        else:
+            logger.error("Error importing " + schema + "." + table)
+            logger.debug(cmd_message)
+    except:
+        logger.error("Failed importing table")
+    return return_code, row_count
+
+
 def run_export_query(driver, server, database, port, user, password, trusted_connection, query,  file_path, delimiter,
                      rows=5000):
     try:
@@ -311,52 +359,13 @@ class Database:
         finally:
             return return_code
 
-    def import_file(self, schema, table, file_path, delimiter, codepage):
+    def import_file(self, schema, table, path, delimiter=','):
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
-        try:
-            # Import data
-            bcp_in = ['bcp']
-            bcp_in.append('[' + self._database + '].[' + schema + '].[' + table + ']')
-            bcp_in.append('in')
-            bcp_in.append(file_path)
-            bcp_in.append('-t' + delimiter)
-            bcp_in.append('-c')
-            bcp_in.append('-C' + self._codepage)
-            bcp_in.append('-b100000')
-            bcp_in.append('-S' + self._server)
-            if self._trusted_connection:
-                bcp_in.append('-T')
-            else:
-                bcp_in.append('-U' + self._user)
-                bcp_in.append('-P' + self._password)
-
-            logger.debug(bcp_in)
-            cmd_code, cmd_message = utils.run_cmd(bcp_in)
-            return_code = 'ERROR'
-            row_count = 0
-
-            if cmd_code == 0:
-                try:
-                    errors = cmd_message.count('Error')
-                    if errors > 0:
-                        logger.error('Importing in ' + schema + "." + table + ' completed with errors')
-                    return_message = cmd_message.splitlines()
-                    try:
-                        row_count = int(return_message[-3].split()[0])
-                        return_code = 'RUN'
-                    except:
-                        if return_message[2].split()[0] == 'SQLState':
-                            logger.debug(cmd_message)
-                            return_code = "WARN"
-                except:
-                    logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
-            else:
-                logger.error("Error importing " + schema + "." + table)
-                logger.debug(cmd_message)
-        except:
-            logger.error("Failed importing table")
-        return return_code, row_count
+        return_code, row_count = run_import_file(self._server, self._database, self._user, self._password,
+                                                 self._trusted_connection, self._codepage, schema, table, path,
+                                                 delimiter)
+        return row_count
 
     def import_table(self, schema, table, path, delimiter=',', codepage='1252'):
         if self._read_only:
