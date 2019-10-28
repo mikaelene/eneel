@@ -1,32 +1,12 @@
-import os
 import sys
 import psycopg2
 import psycopg2.extras
 from time import time
 from datetime import datetime
-from glob import glob
 import eneel.utils as utils
-
-from concurrent.futures import ThreadPoolExecutor as Executor
 
 import logging
 logger = logging.getLogger('main_logger')
-
-
-def parallelized_export(server, user, password, database, port,
-                        query, file_path, delimiter):
-    db = Database(server, user, password, database, port)
-    # Create and run the cmd
-    sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
-    file = open(file_path, "w")
-    try:
-        db.cursor.copy_expert(sql=sql % (query, delimiter), file=file)
-        row_count = db.cursor.rowcount
-        return row_count
-    except psycopg2.Error as e:
-        logger.error(e)
-    finally:
-        db.close()
 
 
 def run_import_file(server, user, password, database, port,
@@ -338,50 +318,6 @@ class Database:
         row_count = run_import_file(self._server, self._user, self._password, self._database, self._port,
                                     schema_table, path, delimiter)
         return row_count
-
-
-    def import_table(self, schema, table, path, delimiter=','):
-        if self._read_only:
-            sys.exit("This source is readonly. Terminating load run")
-        try:
-            schema_table = schema + '.' + table
-            total_row_count = 0
-            csv_files = glob(os.path.join(path, '*.csv'))
-            servers = []
-            users = []
-            passwords = []
-            databases = []
-            ports = []
-            file_paths = []
-            schema_tables = []
-            delimiters = []
-
-            for file_path in csv_files:
-                servers.append(self._server)
-                users.append(self._user)
-                passwords.append(self._password)
-                databases.append(self._database)
-                ports.append(self._port)
-                file_paths.append(file_path)
-                schema_tables.append(schema_table)
-                delimiters.append(delimiter)
-
-            try:
-                with Executor(max_workers=self._table_parallel_loads) as executor:
-                    for row_count in executor.map(run_import_file,
-                                                  servers, users, passwords, databases, ports,
-                                                  schema_tables, file_paths, delimiters):
-                        total_row_count += row_count
-            except Exception as exc:
-                print(exc)
-
-            #logger.info(row_count+ " records imported")
-
-            return 'RUN', total_row_count
-
-        except:
-            logger.error("Failed importing table")
-            return "ERROR", e
 
     def generate_create_table_ddl(self, schema, table, columns):
         try:

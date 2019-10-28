@@ -52,7 +52,6 @@ class Database:
             self._table_parallel_batch_size = table_parallel_batch_size
 
             os.environ['NLS_LANG'] = 'AMERICAN_AMERICA.WE8ISO8859P1'
-            #os.environ['NLS_LANG'] = 'SWEDISH_SWEDEN.WE8ISO8859P1'
             self._conn = cx_Oracle.connect(user, password, server_db)
 
             self._conn.outputtypehandler = NumbersAsDecimal
@@ -233,10 +232,7 @@ class Database:
         if self._limit_rows:
             select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
 
-        #select_stmt += ";"
-
         return select_stmt
-
 
     def export_query(self, query, file_path, delimiter, rows=5000):
         rowcounts = run_export_query(self._server, self._user, self._password, self._database, self._port, query, file_path,

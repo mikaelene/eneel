@@ -1,11 +1,7 @@
-import os
 import sys
 import pyodbc
-import eneel.utils as utils
 from time import time
 from datetime import datetime
-from glob import glob
-from concurrent.futures import ThreadPoolExecutor as Executor
 import eneel.utils as utils
 
 import logging
@@ -78,6 +74,7 @@ def run_export_query(driver, server, database, port, user, password, trusted_con
         db.close()
     except Exception as e:
         logger.error(e)
+
 
 class Database:
     def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
@@ -366,64 +363,6 @@ class Database:
                                                  self._trusted_connection, self._codepage, schema, table, path,
                                                  delimiter)
         return row_count
-
-    def import_table(self, schema, table, path, delimiter=',', codepage='1252'):
-        if self._read_only:
-            sys.exit('This source is readonly. Terminating load run')
-        try:
-            schema_table = schema + '.' + table
-            csv_files = glob(os.path.join(path, '*.csv'))
-            servers = []
-            users = []
-            passwords = []
-            databases = []
-            ports = []
-            file_paths = []
-            schemas = []
-            tables = []
-            delimiters = []
-            codepages = []
-
-            for file_path in csv_files:
-                servers.append(self._server)
-                users.append(self._user)
-                passwords.append(self._password)
-                databases.append(self._database)
-                ports.append(self._port)
-                file_paths.append(file_path)
-                schemas.append(schema)
-                tables.append(table)
-                delimiters.append(delimiter)
-                codepages.append(codepage)
-
-            table_workers = self._table_parallel_loads
-            if len(file_paths) < table_workers:
-                table_workers = len(file_paths)
-
-            total_row_counts = []
-            return_codes = []
-            try:
-                with Executor(max_workers=table_workers) as executor:
-                    for return_code, row_count in executor.map(self.import_file,
-                                                  schemas, tables,  file_paths, delimiters, codepages):
-                        return_codes.append(return_code)
-                        total_row_counts.append(row_count)
-            except Exception as exc:
-                    logger.debug(exc)
-
-            if 'ERROR' in return_codes:
-                return_code == 'ERROR'
-            elif 'WARN' in return_codes:
-                return_code == 'WARN'
-            else:
-                return_code == 'DONE'
-
-            total_row_count = sum(total_row_counts)
-
-            return return_code, total_row_count
-
-        except:
-            logger.error("Failed importing table")
 
     def generate_create_table_ddl(self, schema, table, columns):
         try:
