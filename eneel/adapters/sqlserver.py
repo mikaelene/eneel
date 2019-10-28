@@ -476,7 +476,8 @@ class Database:
                 except:
                     logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
             else:
-                logger.debug("Error importing " + schema + "." + table + " :" + cmd_message)
+                logger.error("Error importing " + schema + "." + table)
+                logger.debug(cmd_message)
         except:
             logger.error("Failed importing table")
         return return_code, row_count

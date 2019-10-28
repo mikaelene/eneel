@@ -84,10 +84,19 @@ def export_csv(rows, filename, delimiter='|'):
         for row in rows:
             csv_row = ''
             for i in range(len(row)):
+                col = row[i]
+                if col is None:
+                    col = ''
+                if col is True:
+                    col = 1
+                if col is False:
+                    col = 0
+
+                #col = (row[i] or '')
                 if i < len(row)-1:
-                    col = str(row[i]) + delimiter
+                    col = str(col).strip() + delimiter
                 else:
-                    col = str(row[i])
+                    col = str(col).strip()
                 csv_row += col
             csv_file.write(csv_row + '\n')
         csv_file.close()

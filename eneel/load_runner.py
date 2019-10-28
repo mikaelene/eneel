@@ -250,19 +250,27 @@ def strategy_full_table_load(return_code, index, total, source, source_schema, s
                                                                                 replication_key=None,
                                                                                 max_replication_key=None,
                                                                                 parallelization_key=parallelization_key)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
 
         # Create temp table
         return_code = create_temp_table(return_code, index, total, target, target_schema, target_table_tmp, columns,
                                         full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
 
         # Import into temp table
         return_code, import_row_count = import_into_temp_table(return_code, index, total, target, target_schema,
                                                                target_table_tmp, temp_path_load, delimiter,
                                                                full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
 
         # Switch tables
         return_code = switch_table(return_code, index, total, target, target_schema, target_table, target_table_tmp,
                                    full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
 
         # Return success
         if return_code == 'RUN':
@@ -330,20 +338,29 @@ def strategy_incremental(return_code, index, total, source, source_schema, sourc
                                                                                     replication_key=replication_key,
                                                                                     max_replication_key=max_replication_key,
                                                                                     parallelization_key=parallelization_key)
+            if return_code == 'ERROR':
+                return return_code, export_row_count, import_row_count
 
             # Create temp table
             return_code = create_temp_table(return_code, index, total, target, target_schema, target_table_tmp,
                                             columns,
                                             full_source_table)
+            if return_code == 'ERROR':
+                return return_code, export_row_count, import_row_count
 
             # Import into temp table
             return_code, import_row_count = import_into_temp_table(return_code, index, total, target, target_schema,
                                                                    target_table_tmp, temp_path_load, delimiter,
                                                                    full_source_table)
+            if return_code == 'ERROR':
+                return return_code, export_row_count, import_row_count
 
             # Insert into and drop
             return_code = insert_from_table_and_drop_tmp(return_code, index, total, target, target_schema,
                                                         target_table, target_table_tmp, full_source_table)
+            if return_code == 'ERROR':
+                return return_code, export_row_count, import_row_count
+
             # Return success
             if return_code == 'RUN':
                 return_code = 'DONE'
