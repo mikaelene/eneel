@@ -46,7 +46,6 @@ def parallelized_import(server, user, password, database, port,
 
 
 def run_export_query(server, user, password, database, port, query, file_path, delimiter, rows=5000):
-    print('batch')
     try:
         db = Database(server, user, password, database, port)
         db.cursor.execute(query)

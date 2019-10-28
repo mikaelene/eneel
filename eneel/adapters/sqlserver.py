@@ -42,6 +42,7 @@ class Database:
                 conn_string += ";trusted_connection=yes"
             else:
                 conn_string += ";UID=" + user + ";PWD=" + password
+            self._driver = driver
             self._server = server
             self._user = user
             self._password = password
@@ -266,18 +267,10 @@ class Database:
         return select_stmt
 
     def export_query(self, query, file_path, delimiter, rows=5000):
-        try:
-            export = self.cursor.execute(query)
-            rowcounts = 0
-            while rows:
-                try:
-                    rows = export.fetchmany(rows)
-                except:
-                    return rowcounts
-                rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
-                rowcounts = rowcounts + rowcount
-        except Exception as e:
-            logger.error(e)
+        rowcounts = run_export_query(self._driver, self._server, self._database, self._port, self._user, self._password,
+                                     self._trusted_connection, query, file_path, delimiter, rows)
+        return rowcounts
+
 
     def export_query_old(self, query, file_path, delimiter):
         # Export data
