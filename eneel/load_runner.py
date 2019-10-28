@@ -5,6 +5,7 @@ import eneel.printer as printer
 from time import time
 from datetime import datetime
 import eneel.config as config
+from glob import glob
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -194,13 +195,39 @@ def create_temp_table(return_code, index, total, target, target_schema, target_t
 def import_into_temp_table(return_code, index, total, target, target_schema, target_table_tmp, temp_path_load,
                            delimiter, full_source_table):
     try:
-        return_code, import_row_count = target.import_table(target_schema, target_table_tmp, temp_path_load, delimiter)
+        csv_files = glob(os.path.join(temp_path_load, '*.csv'))
+        target_schemas = []
+        target_table_tmps = []
+        temp_path_loads = []
+        delimiters = []
+        for file_path in csv_files:
+            target_schemas.append(target_schema)
+            target_table_tmps.append(target_table_tmp)
+            temp_path_loads.append(file_path)
+            delimiters.append(delimiter)
+
+        table_workers = target._table_parallel_loads
+        if len(temp_path_loads) < table_workers:
+            table_workers = len(temp_path_loads)
+
+        total_row_count = 0
+
+        try:
+            with Executor(max_workers=table_workers) as executor:
+                for row_count in executor.map(target.import_file, target_schemas, target_table_tmps, temp_path_loads,
+                                              delimiters):
+                    total_row_count += row_count
+                return_code = 'RUN'
+        except Exception as exc:
+            logger.error(exc)
+            return_code = 'ERROR'
+
+        #return_code, import_row_count = target.import_table(target_schema, target_table_tmp, temp_path_load, delimiter)
     except:
         return_code = 'ERROR'
-        import_row_count = 0
         printer.print_load_line(index, total, return_code, full_source_table, msg="failed import into temptable")
     finally:
-        return return_code, import_row_count
+        return return_code, total_row_count
 
 
 def switch_table(return_code, index, total, target, target_schema, target_table, target_table_tmp, full_source_table):

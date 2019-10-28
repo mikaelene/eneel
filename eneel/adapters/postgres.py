@@ -7,7 +7,7 @@ from datetime import datetime
 from glob import glob
 import eneel.utils as utils
 
-from concurrent.futures import ProcessPoolExecutor as Executor
+from concurrent.futures import ThreadPoolExecutor as Executor
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -61,6 +61,8 @@ def run_export_query(server, user, password, database, port, query, file_path, d
         db.close()
     except Exception as e:
         logger.error(e)
+
+
 
 
 class Database:
@@ -328,6 +330,13 @@ class Database:
             return_code = 'ERROR'
         finally:
             return return_code
+
+    def import_file(self, schema, table, path, delimiter=','):
+        schema_table = schema + '.' + table
+        row_count = parallelized_import(self._server, self._user, self._password, self._database, self._port,
+                                        schema_table, path, delimiter)
+        return row_count
+
 
     def import_table(self, schema, table, path, delimiter=','):
         if self._read_only:
