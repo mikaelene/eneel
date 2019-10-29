@@ -1,34 +1,16 @@
-import os
 import sys
 import psycopg2
 import psycopg2.extras
 from time import time
 from datetime import datetime
-from glob import glob
-from concurrent.futures import ProcessPoolExecutor as Executor
+import eneel.utils as utils
 
 import logging
 logger = logging.getLogger('main_logger')
 
 
-def parallelized_export(server, user, password, database, port,
-                        query, file_path, delimiter):
-    db = Database(server, user, password, database, port)
-    # Create and run the cmd
-    sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
-    file = open(file_path, "w")
-    try:
-        db.cursor.copy_expert(sql=sql % (query, delimiter), file=file)
-        row_count = db.cursor.rowcount
-        return row_count
-    except psycopg2.Error as e:
-        logger.error(e)
-    finally:
-        db.close()
-
-
-def parallelized_import(server, user, password, database, port,
-                        schema_table, file_path, delimiter):
+def run_import_file(server, user, password, database, port,
+                    schema_table, file_path, delimiter):
     db = Database(server, user, password, database, port)
     # Create and run the cmd
     sql = "COPY %s FROM STDIN WITH DELIMITER AS '%s'"
@@ -43,9 +25,29 @@ def parallelized_import(server, user, password, database, port,
         db.close()
 
 
+def run_export_query(server, user, password, database, port, query, file_path, delimiter, rows=5000):
+    try:
+        db = Database(server, user, password, database, port)
+        db.cursor.execute(query)
+        rowcounts = 0
+        while rows:
+            try:
+                rows = db.cursor.fetchmany(rows)
+            except:
+                return rowcounts
+            rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+            rowcounts = rowcounts + rowcount
+        return rowcounts
+        db.close()
+    except Exception as e:
+        logger.error(e)
+
+
+
+
 class Database:
-    def __init__(self, server, user, password, database, port=5432, limit_rows=None, read_only=False,
-                 table_parallel_loads=10, table_parallel_batch_size=10000000):
+    def __init__(self, server, user, password, database, port=5432, limit_rows=None, table_where_clause=None,
+                 read_only=False, table_parallel_loads=10, table_parallel_batch_size=10000000):
         try:
             conn_string = "host=" + server + " dbname=" + \
                           database + " user=" + user + " password=" + password
@@ -56,6 +58,7 @@ class Database:
             self._port = port
             self._dialect = "postgres"
             self._limit_rows = limit_rows
+            self._table_where_clause = table_where_clause
             self._read_only = read_only
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
@@ -172,7 +175,7 @@ class Database:
             SELECT 1
             FROM   information_schema.tables 
             WHERE  table_schema || '.' || table_name = '"""
-            check_statement += table_name + "')"
+            check_statement += table_name.lower() + "')"
             exists = self.query(check_statement)
             return exists[0][0]
         except:
@@ -232,108 +235,41 @@ class Database:
         except:
             logger.debug("Failed getting min, max and batch column value")
 
-    def export_query(self, query, file_path, delimiter):
-        # Create and run the cmd
-        sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
-        file = open(file_path, "w")
-        try:
-            self.cursor.copy_expert(sql=sql % (query, delimiter), file=file)
-            row_count = self.cursor.rowcount
-            return row_count
-        except psycopg2.Error as e:
-            logger.error(e)
+    def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
+                              parallelization_where=None):
 
-    def export_table(self,
-                     schema,
-                     table,
-                     columns,
-                     path,
-                     delimiter=',',
-                     replication_key=None,
-                     max_replication_key=None,
-                     parallelization_key=None):
+        # Generate SQL statement for extract
+        select_stmt = "SELECT "
+        # Add columns
+        for col in columns:
+            column_name = col[1]
+            select_stmt += column_name + ", "
+        select_stmt = select_stmt[:-2]
 
-        try:
-            # Generate SQL statement for extract
-            select_stmt = "SELECT "
+        select_stmt += ' FROM ' + schema + "." + table
 
-            # Add columns
-            for col in columns:
-                column_name = col[1]
-                select_stmt += column_name + ", "
-            select_stmt = select_stmt[:-2]
+        # Where-claues for incremental replication
+        if replication_key:
+            replication_where = replication_key + " > " + "'" + max_replication_key + "'"
+        else:
+            replication_where = None
 
-            select_stmt += " FROM " + schema + '.' + table
+        wheres = replication_where, self._table_where_clause, parallelization_where
+        wheres = [x for x in wheres if x is not None]
+        if len(wheres) > 0:
+            select_stmt += " WHERE " + wheres[0]
+            for where in wheres[1:]:
+                select_stmt += " AND " + where
 
-            # Add incremental where
-            if replication_key:
-                select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
+        if self._limit_rows:
+            select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
 
-            # Add limit
-            if self._limit_rows:
-                select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
-            logger.debug(select_stmt)
+        return select_stmt
 
-            # Add logic for parallelization_key
-            if parallelization_key:
-                min_parallelization_key, max_parallelization_key, batch_size_key = self.get_min_max_batch(
-                    schema + '.' + table,
-                    parallelization_key)
-                batch_id = 1
-                batch_start = min_parallelization_key
-                total_row_count = 0
-                servers = []
-                users = []
-                passwords = []
-                databases = []
-                ports = []
-                file_paths =[]
-                batch_stmts = []
-                delimiters = []
-                batches = []
-                while batch_start < max_parallelization_key:
-                    file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
-                    file_path = os.path.join(path, file_name)
-
-                    batch_stmt = "SELECT * FROM (" + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size_key - 1)
-                    servers.append(self._server)
-                    users.append(self._user)
-                    passwords.append(self._password)
-                    databases.append(self._database)
-                    ports.append(self._port)
-                    file_paths.append(file_path)
-                    batch_stmts.append(batch_stmt)
-                    delimiters.append(delimiter)
-                    batch = (batch_stmt, file_path)
-                    batches.append(batch)
-                    batch_start += batch_size_key
-                    batch_id += 1
-
-                table_workers = self._table_parallel_loads
-                if len(batch_stmts) < table_workers:
-                    table_workers = len(batch_stmts)
-
-                try:
-                    with Executor(max_workers=table_workers) as executor:
-                        for row_count in executor.map(parallelized_export,
-                                                      servers, users, passwords, databases, ports,
-                                                      batch_stmts, file_paths, delimiters):
-                            total_row_count += row_count
-                except Exception as exc:
-                    print(exc)
-
-            else:
-                file_name = self._database + "_" + schema + "_" + table + ".csv"
-                file_path = os.path.join(path, file_name)
-
-                total_row_count = self.export_query(select_stmt, file_path, delimiter)
-
-            logger.debug(str(total_row_count) + " records exported")
-
-            # Do not return file.
-            return path, delimiter, total_row_count
-        except:
-            logger.error("Failed exporting table")
+    def export_query(self, query, file_path, delimiter, rows=5000):
+        rowcounts = run_export_query(self._server, self._user, self._password, self._database, self._port, query, file_path,
+                         delimiter, rows=5000)
+        return rowcounts
 
     def insert_from_table_and_drop(self, schema, to_table, from_table):
         if self._read_only:
@@ -375,48 +311,13 @@ class Database:
         finally:
             return return_code
 
-    def import_table(self, schema, table, path, delimiter=','):
+    def import_file(self, schema, table, path, delimiter=','):
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
-        try:
-            schema_table = schema + '.' + table
-            total_row_count = 0
-            csv_files = glob(os.path.join(path, '*.csv'))
-            servers = []
-            users = []
-            passwords = []
-            databases = []
-            ports = []
-            file_paths = []
-            schema_tables = []
-            delimiters = []
-
-            for file_path in csv_files:
-                servers.append(self._server)
-                users.append(self._user)
-                passwords.append(self._password)
-                databases.append(self._database)
-                ports.append(self._port)
-                file_paths.append(file_path)
-                schema_tables.append(schema_table)
-                delimiters.append(delimiter)
-
-            try:
-                with Executor(max_workers=self._table_parallel_loads) as executor:
-                    for row_count in executor.map(parallelized_import,
-                                                  servers, users, passwords, databases, ports,
-                                                  schema_tables, file_paths, delimiters):
-                        total_row_count += row_count
-            except Exception as exc:
-                print(exc)
-
-            #logger.info(row_count+ " records imported")
-
-            return 'RUN', total_row_count
-
-        except:
-            logger.error("Failed importing table")
-            return "ERROR", e
+        schema_table = schema + '.' + table
+        row_count = run_import_file(self._server, self._user, self._password, self._database, self._port,
+                                    schema_table, path, delimiter)
+        return row_count
 
     def generate_create_table_ddl(self, schema, table, columns):
         try:
@@ -431,6 +332,8 @@ class Database:
                 numeric_scale = col[5]
 
                 column = column_name + " " + data_type
+                if "varchar2" in data_type:
+                    column = column_name + " " + "varchar"
                 if "char" in data_type:
                     column += "("
                     if character_maximum_length == -1:
@@ -440,6 +343,8 @@ class Database:
                     column += ")"
                 elif "numeric" in data_type:
                     column += "(" + str(numeric_precision) + "," + str(numeric_scale) + ")"
+                elif "number" in data_type:
+                    column = column_name + " " + "numeric"
                 elif data_type == "USER-DEFINED":
                     column = column_name + " TEXT"
                 elif data_type == "ARRAY":

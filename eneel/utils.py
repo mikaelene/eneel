@@ -3,6 +3,8 @@ import sys
 import subprocess
 import shutil
 import yaml
+import csv
+
 import logging
 logger = logging.getLogger('main_logger')
 
@@ -76,4 +78,32 @@ def run_cmd(cmd, envs=None):
         return -1, sys.exc_info()[0]
 
 
+def export_csv(rows, filename, delimiter='|'):
+    try:
+        csv_file = open(filename, "a")
+        for row in rows:
+            csv_row = ''
+            for i in range(len(row)):
+                col = row[i]
+                if col is None:
+                    col = ''
+                if col is True:
+                    col = 1
+                if col is False:
+                    col = 0
+
+                #col = (row[i] or '')
+                if i < len(row)-1:
+                    col = str(col).strip() + delimiter
+                else:
+                    col = str(col).strip()
+                csv_row += col
+            csv_file.write(csv_row + '\n')
+        csv_file.close()
+        rowcount = len(rows)
+        #logger.info(str(rowcount) + " rows added to " + filename)
+        return rowcount
+    except Exception as e:
+        logger.error(e)
+        return 0
 

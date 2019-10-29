@@ -1,20 +1,85 @@
-import os
 import sys
 import pyodbc
-import eneel.utils as utils
 from time import time
 from datetime import datetime
-from glob import glob
-from concurrent.futures import ThreadPoolExecutor as Executor
+import eneel.utils as utils
 
 import logging
 logger = logging.getLogger('main_logger')
 
 
+def run_import_file(server, database, user, password, trusted_connection, codepage, schema, table, file_path,
+                delimiter):
+
+    try:
+        # Import data
+        bcp_in = ['bcp']
+        bcp_in.append('[' + database + '].[' + schema + '].[' + table + ']')
+        bcp_in.append('in')
+        bcp_in.append(file_path)
+        bcp_in.append('-t' + delimiter)
+        bcp_in.append('-c')
+        bcp_in.append('-C' + codepage)
+        bcp_in.append('-b100000')
+        bcp_in.append('-S' + server)
+        if trusted_connection:
+            bcp_in.append('-T')
+        else:
+            bcp_in.append('-U' + user)
+            bcp_in.append('-P' + password)
+
+        logger.debug(bcp_in)
+        cmd_code, cmd_message = utils.run_cmd(bcp_in)
+        return_code = 'ERROR'
+        row_count = 0
+
+        if cmd_code == 0:
+            try:
+                errors = cmd_message.count('Error')
+                if errors > 0:
+                    logger.error('Importing in ' + schema + "." + table + ' completed with errors')
+                return_message = cmd_message.splitlines()
+                try:
+                    row_count = int(return_message[-3].split()[0])
+                    return_code = 'RUN'
+                except:
+                    if return_message[2].split()[0] == 'SQLState':
+                        logger.debug(cmd_message)
+                        return_code = "WARN"
+            except:
+                logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
+        else:
+            logger.error("Error importing " + schema + "." + table)
+            logger.debug(cmd_message)
+    except:
+        logger.error("Failed importing table")
+    return return_code, row_count
+
+
+def run_export_query(driver, server, database, port, user, password, trusted_connection, query,  file_path, delimiter,
+                     rows=5000):
+    try:
+        db = Database(driver, server, database, port, limit_rows=None, user=user, password=password,
+                      trusted_connection=trusted_connection)
+        export = db.cursor.execute(query)
+        rowcounts = 0
+        while rows:
+            try:
+                rows = export.fetchmany(rows)
+            except:
+                return rowcounts
+            rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+            rowcounts = rowcounts + rowcount
+        return rowcounts
+        db.close()
+    except Exception as e:
+        logger.error(e)
+
+
 class Database:
     def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
                  trusted_connection=None, as_columnstore=False, read_only=False, codepage=None,
-                 table_parallel_loads=10, table_parallel_batch_size=10000000):
+                 table_parallel_loads=10, table_parallel_batch_size=10000000, table_where_clause=None):
         try:
             conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
                           database + ";PORT=" + str(port)
@@ -22,6 +87,7 @@ class Database:
                 conn_string += ";trusted_connection=yes"
             else:
                 conn_string += ";UID=" + user + ";PWD=" + password
+            self._driver = driver
             self._server = server
             self._user = user
             self._password = password
@@ -38,6 +104,7 @@ class Database:
                 self._codepage = '1252'
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
+            self._table_where_clause = table_where_clause
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
@@ -213,121 +280,41 @@ class Database:
         except:
             logger.debug("Failed getting min, max and batch column value")
 
-    def export_query(self, query, file_path, delimiter):
-        # Export data
-        # Generate bcp command
-        bcp_out = ['bcp']
-        bcp_out.append(query)
-        bcp_out.append('queryout')
-        bcp_out.append(file_path)
-        bcp_out.append('-t' + delimiter)
-        bcp_out.append('-c')
-        bcp_out.append('-C' + self._codepage)
-        bcp_out.append('-S' + self._server)
-        if self._trusted_connection:
-            bcp_out.append('-T')
+    def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
+                              parallelization_where=None):
+        # Generate SQL statement for extract
+        select_stmt = 'SELECT '
+
+        # Add limit
+        if self._limit_rows:
+            select_stmt += 'TOP ' + str(self._limit_rows) + ' '
+
+        # Add columns
+        for col in columns:
+            column_name = "[" + col[1] + "]"
+            select_stmt += column_name + ", "
+        select_stmt = select_stmt[:-2]
+
+        select_stmt += ' FROM [' + self._database + '].[' + schema + '].[' + table + ']' + ' WITH (NOLOCK)'
+
+        # Where-claues for incremental replication
+        if replication_key:
+            replication_where = replication_key + " > " + "'" + max_replication_key + "'"
         else:
-            bcp_out.append('-U' + self._user)
-            bcp_out.append('-P' + self._password)
+            replication_where = None
 
-        logger.debug(bcp_out)
+        wheres = replication_where, self._table_where_clause, parallelization_where
+        wheres = [x for x in wheres if x is not None]
+        if len(wheres) > 0:
+            select_stmt += " WHERE " + wheres[0]
+            for where in wheres[1:]:
+                select_stmt += " AND " + where
+        return select_stmt
 
-        cmd_code, cmd_message = utils.run_cmd(bcp_out)
-        if cmd_code == 0:
-            try:
-                return_message = cmd_message.splitlines()
-                row_count = int(return_message[-3].split()[0])
-                timing = str(return_message[-1].split()[5])
-                if row_count > 0:
-                    average = str(return_message[-1].split()[8][1:-3])
-                else:
-                    average = '0'
-                logger.debug(query + ": " + str(
-                    row_count) + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
-                return row_count
-            except:
-                logger.warning(query + ": " + "Failed to parse sucessfull export cmd for")
-            logger.debug(query + " exported")
-        else:
-            logger.error("Error exportng " + query + " :" + cmd_message)
-
-    def export_table(self,
-                     schema,
-                     table,
-                     columns,
-                     path,
-                     delimiter=',',
-                     replication_key=None,
-                     max_replication_key=None,
-                     parallelization_key=None):
-        try:
-            # Generate SQL statement for extract
-            select_stmt = 'SELECT '
-
-            # Add limit
-            if self._limit_rows:
-                select_stmt += 'TOP ' + str(self._limit_rows) + ' '
-
-            # Add columns
-            for col in columns:
-                column_name = "[" + col[1] + "]"
-                select_stmt += column_name + ", "
-            select_stmt = select_stmt[:-2]
-
-            select_stmt += ' FROM [' + self._database + '].[' + schema + '].[' + table + ']' + ' WITH (NOLOCK)'
-
-            # Add incremental where
-            if replication_key:
-                select_stmt += " WHERE " + replication_key + " > " + "'" + max_replication_key + "'"
-            #select_stmt += '"'
-            logger.debug(select_stmt)
-
-            # Add logic for parallelization_key
-            if parallelization_key:
-                min_parallelization_key, max_parallelization_key, batch_size_key = self.get_min_max_batch(
-                    schema + '.' + table,
-                    parallelization_key)
-                batch_id = 1
-                batch_start = min_parallelization_key
-                total_row_count = 0
-                file_paths = []
-                batch_stmts = []
-                delimiters = []
-                batches = []
-                while batch_start < max_parallelization_key:
-                    file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
-                    file_path = os.path.join(path, file_name)
-                    batch_stmt = 'SELECT * FROM (' + select_stmt + ") q WHERE " + parallelization_key + ' between ' + str(
-                        batch_start) + ' and ' + str(batch_start + batch_size_key - 1)
-                    file_paths.append(file_path)
-                    batch_stmts.append(batch_stmt)
-                    delimiters.append(delimiter)
-                    batch = (batch_stmt, file_path)
-                    batches.append(batch)
-                    batch_start += batch_size_key
-                    batch_id += 1
-
-                table_workers = self._table_parallel_loads
-                if len(batch_stmts) < table_workers:
-                    table_workers = len(batch_stmts)
-
-                try:
-                    with Executor(max_workers=table_workers) as executor:
-                        for row_count in executor.map(self.export_query, batch_stmts, file_paths, delimiters):
-                            total_row_count += row_count
-                except Exception as exc:
-                    logger.error(exc)
-
-            else:
-                # Generate file name
-                file_name = self._database + '_' + schema + '_' + table + '.csv'
-                file_path = os.path.join(path, file_name)
-
-                total_row_count = self.export_query(select_stmt, file_path, delimiter)
-
-            return path, delimiter, total_row_count
-        except:
-            logger.error("Failed exporting table")
+    def export_query(self, query, file_path, delimiter, rows=5000):
+        rowcounts = run_export_query(self._driver, self._server, self._database, self._port, self._user, self._password,
+                                     self._trusted_connection, query, file_path, delimiter, rows)
+        return rowcounts
 
     def insert_from_table_and_drop(self, schema, to_table, from_table):
         if self._read_only:
@@ -369,106 +356,13 @@ class Database:
         finally:
             return return_code
 
-    def import_file(self, schema, table, file_path, delimiter, codepage):
+    def import_file(self, schema, table, path, delimiter=','):
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
-        try:
-            # Import data
-            bcp_in = ['bcp']
-            bcp_in.append('[' + self._database + '].[' + schema + '].[' + table + ']')
-            bcp_in.append('in')
-            bcp_in.append(file_path)
-            bcp_in.append('-t' + delimiter)
-            bcp_in.append('-c')
-            bcp_in.append('-C' + self._codepage)
-            bcp_in.append('-b100000')
-            bcp_in.append('-S' + self._server)
-            if self._trusted_connection:
-                bcp_in.append('-T')
-            else:
-                bcp_in.append('-U' + self._user)
-                bcp_in.append('-P' + self._password)
-
-            logger.debug(bcp_in)
-            cmd_code, cmd_message = utils.run_cmd(bcp_in)
-            return_code = 'ERROR'
-            row_count = 0
-
-            if cmd_code == 0:
-                try:
-                    return_message = cmd_message.splitlines()
-                    try:
-                        row_count = int(return_message[-3].split()[0])
-                        return_code = 'RUN'
-                    except:
-                        if return_message[2].split()[0] == 'SQLState':
-                            logger.debug(cmd_message)
-                            return_code = "WARN"
-                except:
-                    logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
-            else:
-                logger.debug("Error importing " + schema + "." + table + " :" + cmd_message)
-        except:
-            logger.error("Failed importing table")
-        return return_code, row_count
-
-    def import_table(self, schema, table, path, delimiter=',', codepage='1252'):
-        if self._read_only:
-            sys.exit('This source is readonly. Terminating load run')
-        try:
-            schema_table = schema + '.' + table
-            csv_files = glob(os.path.join(path, '*.csv'))
-            servers = []
-            users = []
-            passwords = []
-            databases = []
-            ports = []
-            file_paths = []
-            schemas = []
-            tables = []
-            delimiters = []
-            codepages = []
-
-            for file_path in csv_files:
-                servers.append(self._server)
-                users.append(self._user)
-                passwords.append(self._password)
-                databases.append(self._database)
-                ports.append(self._port)
-                file_paths.append(file_path)
-                schemas.append(schema)
-                tables.append(table)
-                delimiters.append(delimiter)
-                codepages.append(codepage)
-
-            table_workers = self._table_parallel_loads
-            if len(file_paths) < table_workers:
-                table_workers = len(file_paths)
-
-            total_row_counts = []
-            return_codes = []
-            try:
-                with Executor(max_workers=table_workers) as executor:
-                    for return_code, row_count in executor.map(self.import_file,
-                                                  schemas, tables,  file_paths, delimiters, codepages):
-                        return_codes.append(return_code)
-                        total_row_counts.append(row_count)
-            except Exception as exc:
-                    logger.debug(exc)
-
-            if 'ERROR' in return_codes:
-                return_code == 'ERROR'
-            elif 'WARN' in return_codes:
-                return_code == 'WARN'
-            else:
-                return_code == 'DONE'
-
-            total_row_count = sum(total_row_counts)
-
-            return return_code, total_row_count
-
-        except:
-            logger.error("Failed importing table")
+        return_code, row_count = run_import_file(self._server, self._database, self._user, self._password,
+                                                 self._trusted_connection, self._codepage, schema, table, path,
+                                                 delimiter)
+        return row_count
 
     def generate_create_table_ddl(self, schema, table, columns):
         try:

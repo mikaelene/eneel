@@ -1,10 +1,11 @@
 import eneel.utils as utils
-from concurrent.futures import ProcessPoolExecutor as Executor
+from concurrent.futures import ThreadPoolExecutor as Executor
 import os
 import eneel.printer as printer
 from time import time
 from datetime import datetime
 import eneel.config as config
+from glob import glob
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -123,21 +124,61 @@ def export_table(return_code,
                  parallelization_key=None):
     # Export table
     try:
-        temp_path_load, delimiter, export_row_count = source.export_table(schema=source_schema,
-                                                                          table=source_table,
-                                                                          columns=columns,
-                                                                          path=temp_path_load,
-                                                                          delimiter=csv_delimiter,
-                                                                          replication_key=replication_key,
-                                                                          max_replication_key=max_replication_key,
-                                                                          parallelization_key=parallelization_key)
+        if parallelization_key:
+            min_parallelization_key, max_parallelization_key, batch_size_key = source.get_min_max_batch(
+                source_schema + '.' + source_table, parallelization_key)
+            batch_id = 1
+            batch_start = min_parallelization_key
+            total_row_count = 0
+            file_paths = []
+            querys = []
+            csv_delimiters = []
+
+            while batch_start <= max_parallelization_key:
+                file_name = source._database + "_" + source_schema + "_" + source_table + "_" + str(batch_id) + ".csv"
+                file_path = os.path.join(temp_path_load, file_name)
+
+                #parallelization_where = source.get_parallelization_where(batch_start, batch_size_key)
+                parallelization_where = parallelization_key + ' between ' + str(batch_start) + ' and ' + \
+                                        str(batch_start + batch_size_key - 1)
+                query = source.generate_export_query(columns, source_schema, source_table,
+                                                        replication_key, max_replication_key, parallelization_where)
+
+                file_paths.append(file_path)
+                querys.append(query)
+                csv_delimiters.append(csv_delimiter)
+
+                batch_start += batch_size_key
+                batch_id += 1
+
+            table_workers = source._table_parallel_loads
+            if len(querys) < table_workers:
+                table_workers = len(querys)
+
+            try:
+                with Executor(max_workers=table_workers) as executor:
+                    for row_count in executor.map(source.export_query, querys, file_paths, csv_delimiters):
+                        total_row_count += row_count
+            except Exception as exc:
+                logger.error(exc)
+
+        else:
+
+            file_name = source._database + "_" + source_schema + "_" + source_table + "_" + ".csv"
+            file_path = os.path.join(temp_path_load, file_name)
+
+            query = source.generate_export_query(columns, source_schema, source_table,
+                                                    replication_key, max_replication_key)
+
+            total_row_count = source.export_query(query, file_path, csv_delimiter)
+
         return_code = 'RUN'
     except:
         return_code = 'ERROR'
         full_source_table = source_schema + '.' + source_table
         printer.print_load_line(index, total, return_code, full_source_table, msg="failed to export")
     finally:
-        return return_code, temp_path_load, delimiter, export_row_count
+        return return_code, temp_path_load, csv_delimiter, total_row_count
 
 
 def create_temp_table(return_code, index, total, target, target_schema, target_table_tmp, columns, full_source_table):
@@ -154,13 +195,39 @@ def create_temp_table(return_code, index, total, target, target_schema, target_t
 def import_into_temp_table(return_code, index, total, target, target_schema, target_table_tmp, temp_path_load,
                            delimiter, full_source_table):
     try:
-        return_code, import_row_count = target.import_table(target_schema, target_table_tmp, temp_path_load, delimiter)
+        csv_files = glob(os.path.join(temp_path_load, '*.csv'))
+        target_schemas = []
+        target_table_tmps = []
+        temp_path_loads = []
+        delimiters = []
+        for file_path in csv_files:
+            target_schemas.append(target_schema)
+            target_table_tmps.append(target_table_tmp)
+            temp_path_loads.append(file_path)
+            delimiters.append(delimiter)
+
+        table_workers = target._table_parallel_loads
+        if len(temp_path_loads) < table_workers:
+            table_workers = len(temp_path_loads)
+
+        total_row_count = 0
+
+        try:
+            with Executor(max_workers=table_workers) as executor:
+                for row_count in executor.map(target.import_file, target_schemas, target_table_tmps, temp_path_loads,
+                                              delimiters):
+                    total_row_count += row_count
+                return_code = 'RUN'
+        except Exception as exc:
+            logger.error(exc)
+            return_code = 'ERROR'
+
+        #return_code, import_row_count = target.import_table(target_schema, target_table_tmp, temp_path_load, delimiter)
     except:
         return_code = 'ERROR'
-        import_row_count = 0
         printer.print_load_line(index, total, return_code, full_source_table, msg="failed import into temptable")
     finally:
-        return return_code, import_row_count
+        return return_code, total_row_count
 
 
 def switch_table(return_code, index, total, target, target_schema, target_table, target_table_tmp, full_source_table):
@@ -210,19 +277,27 @@ def strategy_full_table_load(return_code, index, total, source, source_schema, s
                                                                                 replication_key=None,
                                                                                 max_replication_key=None,
                                                                                 parallelization_key=parallelization_key)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
 
         # Create temp table
         return_code = create_temp_table(return_code, index, total, target, target_schema, target_table_tmp, columns,
                                         full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
 
         # Import into temp table
         return_code, import_row_count = import_into_temp_table(return_code, index, total, target, target_schema,
                                                                target_table_tmp, temp_path_load, delimiter,
                                                                full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
 
         # Switch tables
         return_code = switch_table(return_code, index, total, target, target_schema, target_table, target_table_tmp,
                                    full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
 
         # Return success
         if return_code == 'RUN':
@@ -290,20 +365,29 @@ def strategy_incremental(return_code, index, total, source, source_schema, sourc
                                                                                     replication_key=replication_key,
                                                                                     max_replication_key=max_replication_key,
                                                                                     parallelization_key=parallelization_key)
+            if return_code == 'ERROR':
+                return return_code, export_row_count, import_row_count
 
             # Create temp table
             return_code = create_temp_table(return_code, index, total, target, target_schema, target_table_tmp,
                                             columns,
                                             full_source_table)
+            if return_code == 'ERROR':
+                return return_code, export_row_count, import_row_count
 
             # Import into temp table
             return_code, import_row_count = import_into_temp_table(return_code, index, total, target, target_schema,
                                                                    target_table_tmp, temp_path_load, delimiter,
                                                                    full_source_table)
+            if return_code == 'ERROR':
+                return return_code, export_row_count, import_row_count
 
             # Insert into and drop
             return_code = insert_from_table_and_drop_tmp(return_code, index, total, target, target_schema,
                                                         target_table, target_table_tmp, full_source_table)
+            if return_code == 'ERROR':
+                return return_code, export_row_count, import_row_count
+
             # Return success
             if return_code == 'RUN':
                 return_code = 'DONE'

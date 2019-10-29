@@ -1,34 +1,48 @@
-import os
 import cx_Oracle
 import sys
 import eneel.utils as utils
-from concurrent.futures import ThreadPoolExecutor as Executor
+import decimal
+import os
 
 import logging
 logger = logging.getLogger('main_logger')
 
 
-def run_export_cmd(cmd_commands):
-    envs = [['NLS_LANG', 'SWEDISH_SWEDEN.WE8ISO8859P1']]
-    cmd_code, cmd_message = utils.run_cmd(cmd_commands, envs)
-    if cmd_code == 0:
-        logger.debug(cmd_commands[2] + " exported")
-        return 0
-    else:
-        logger.error(
-            "Error exportng " + cmd_commands[2] + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
-        return 0
+def run_export_query(server, user, password, database, port, query, file_path, delimiter, rows=5000):
+    try:
+        db = Database(server, user, password, database, port)
+        export = db.cursor.execute(query)
+        rowcounts = 0
+        while rows:
+            try:
+                rows = export.fetchmany(rows)
+            except:
+                return rowcounts
+            rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
+            rowcounts = rowcounts + rowcount
+        return rowcounts
+        db.close()
+    except Exception as e:
+        logger.error(e)
+
+
+def NumbersAsDecimal(cursor, name, defaultType, size, precision,
+        scale):
+    if defaultType == cx_Oracle.NUMBER:
+        return cursor.var(str, 100, cursor.arraysize,
+                outconverter = decimal.Decimal)
 
 
 class Database:
-    def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None, read_only=False,
-                 table_parallel_loads=10, table_parallel_batch_size=10000000):
+    def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None,
+                 read_only=False, table_parallel_loads=10, table_parallel_batch_size=1000000):
         try:
             server_db = '{}:{}/{}'.format(server, port, database)
             self._server = server
             self._user = user
             self._password = password
             self._database = database
+            self._port = port
             self._server_db = server_db
             self._dialect = "oracle"
             self._limit_rows = limit_rows
@@ -37,7 +51,11 @@ class Database:
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
 
+            os.environ['NLS_LANG'] = 'AMERICAN_AMERICA.WE8ISO8859P1'
             self._conn = cx_Oracle.connect(user, password, server_db)
+
+            self._conn.outputtypehandler = NumbersAsDecimal
+
             self._cursor = self._conn.cursor()
             logger.debug("Connection to oracle successful")
         except cx_Oracle.Error as e:
@@ -186,52 +204,16 @@ class Database:
         except:
             logger.debug("Failed getting min, max and batch column value")
 
-    def generate_cmd_file(self, sql_file):
-        cmd = "export NLS_LANG=SWEDISH_SWEDEN.WE8ISO8859P1\n"
-        #cmd += "set NLS_NUMERIC_CHARACTERS=. \n"
-        #cmd += "set NLS_TIMESTAMP_TZ_FORMAT=YYYY-MM-DD HH24:MI:SS.FF\n"
-        cmd += "sqlplus " + self._user + "/" + self._password + "@//" + self._server_db + " @" + sql_file
-        logger.debug(cmd)
-        return cmd
-
-    def generate_cmd_command(self, sql_file):
-        cmd = 'sqlplus'
-        ora_conn = self._user + "/" + self._password + "@//" + self._server_db
-        sqlfile = '@' + sql_file
-        cmd_to_run = [cmd, ora_conn, sqlfile]
-        return cmd_to_run
-
-    def generate_spool_cmd(self, file_path, select_stmt):
-        spool_cmd = """
-alter session set NLS_NUMERIC_CHARACTERS = '. ';
-alter session set NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF';
-set markup csv on quote off
-set term off
-set echo off
-set trimspool on 
-set trimout on
-set feedback off
-Set serveroutput off
-set heading off
-set arraysize 5000
-SET LONG 32767 
-spool """
-
-        spool_cmd += file_path + '\n'
-        spool_cmd += select_stmt
-        spool_cmd += "spool off\n"
-        spool_cmd += "exit"
-        logger.debug(spool_cmd)
-        return spool_cmd
-
-    def generate_spool_query(self, columns, delimiter, schema, table, replication_key=None, max_replication_key=None, parallelization_where=None):
+    def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
+                              parallelization_where=None):
         # Generate SQL statement for extract
         select_stmt = "SELECT "
-        for col in columns[:-1]:
+        # Add columns
+        for col in columns:
             column_name = col[1]
-            select_stmt += "REPLACE(" + column_name + ",chr(0),'')" + " || '" + delimiter + "' || \n"
-        last_column_name = "REPLACE(" + columns[-1:][0][1] + ",chr(0),'')"
-        select_stmt += last_column_name
+            select_stmt += column_name + ", "
+        select_stmt = select_stmt[:-2]
+
         select_stmt += ' FROM ' + schema + "." + table
 
         # Where-claues for incremental replication
@@ -250,93 +232,12 @@ spool """
         if self._limit_rows:
             select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
 
-        select_stmt += ";\n"
-
         return select_stmt
 
-    def export_table(self,
-                     schema,
-                     table,
-                     columns,
-                     path,
-                     delimiter=',',
-                     replication_key=None,
-                     max_replication_key=None,
-                     parallelization_key=None):
-        try:
-            # Add logic for parallelization_key
-            if parallelization_key:
-                min_parallelization_key, max_parallelization_key, batch_size_key = self.get_min_max_batch(
-                    schema + '.' + table,
-                    parallelization_key)
-                batch_id = 1
-                batch_start = min_parallelization_key
-                total_row_count = 0
-                cmds_files = []
-                cmds_commands = []
-                while batch_start < max_parallelization_key:
-                    file_name = self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".csv"
-                    file_path = os.path.join(path, file_name)
-                    parallelization_where = parallelization_key + ' between ' + str(batch_start) + ' and ' + str(batch_start + batch_size_key - 1)
-                    batch_stmt = self.generate_spool_query(columns, delimiter, schema, table, replication_key, max_replication_key, parallelization_where)
-                    spool_cmd = self.generate_spool_cmd(file_path, batch_stmt)
-
-                    sql_file = os.path.join(path, self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".sql")
-                    with open(sql_file, "w") as text_file:
-                        text_file.write(spool_cmd)
-
-                    cmd = self.generate_cmd_file(sql_file)
-                    cmd_file = os.path.join(path, self._database + "_" + schema + "_" + table + "_" + str(batch_id) + ".cmd")
-                    with open(cmd_file, "w") as text_file:
-                        text_file.write(cmd)
-
-                    cmds_files.append(cmd_file)
-
-                    cmd_commands = self.generate_cmd_command(sql_file)
-                    cmds_commands.append(cmd_commands)
-                    batch_start += batch_size_key
-                    batch_id += 1
-
-                table_workers = self._table_parallel_loads
-                if len(cmds_files) < table_workers:
-                    table_workers = len(cmds_files)
-
-                try:
-                    with Executor(max_workers=table_workers) as executor:
-                        for row_count in executor.map(run_export_cmd, cmds_commands):
-                        #for row_count in executor.map(run_export_cmd, cmds_files):
-                            total_row_count += row_count
-                except Exception as exc:
-                    logger.error(exc)
-
-            else:
-                # Generate SQL statement for extract
-                select_stmt = self.generate_spool_query(columns, delimiter, schema, table, replication_key, max_replication_key)
-
-                # Generate file name
-                file_name = self._database + "_" + schema + "_" + table + ".csv"
-                file_path = os.path.join(path, file_name)
-
-                spool_cmd = self.generate_spool_cmd(file_path, select_stmt)
-
-                sql_file = os.path.join(path, self._database + "_" + schema + "_" + table + ".sql")
-                with open(sql_file, "w") as text_file:
-                    text_file.write(spool_cmd)
-
-                cmd = self.generate_cmd_file(sql_file)
-                cmd_file = os.path.join(path, self._database + "_" + schema + "_" + table + ".cmd")
-                with open(cmd_file, "w") as text_file:
-                    text_file.write(cmd)
-                    os.chmod(cmd_file, 0o0777)
-
-                cmd_commands = self.generate_cmd_command(sql_file)
-
-                #total_row_count = run_export_cmd(cmd_file)
-                total_row_count = run_export_cmd(cmd_commands)
-
-            return path, delimiter, None
-        except:
-            logger.error("Failed exporting table: " + schema + '.' + table)
+    def export_query(self, query, file_path, delimiter, rows=5000):
+        rowcounts = run_export_query(self._server, self._user, self._password, self._database, self._port, query, file_path,
+                         delimiter, rows=5000)
+        return rowcounts
 
     def insert_from_table_and_drop(self, schema, to_table, from_table):
         return 'Not implemented for this adapter'
