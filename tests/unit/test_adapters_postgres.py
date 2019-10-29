@@ -132,4 +132,15 @@ id_col integer)"""
 
         assert db.query('select count(*) from log_schema.log_table')[0][0] == 1
 
+    def test_query_columns(self, db):
+        query_columns = db.query_columns('select id_col, name_col, datetime_col from test.test1')
+
+        assert type(query_columns) == list
+        assert len(query_columns) > 0
+        assert query_columns[0][1] == 'id_col'
+        assert query_columns[0][2] == 'int'
+        assert query_columns[1][2] == 'varchar'
+        assert query_columns[1][3] == 64
+        assert query_columns[2][2] == 'timestamp'
+
 

@@ -247,7 +247,7 @@ class Database:
                 column_name = column[0]
                 data_type = re.findall(r"'(.+?)'", str(column[1]))[0]
                 if data_type == 'str':
-                    character_maximum_length = column[4]
+                    character_maximum_length = column[3]
                 else:
                     character_maximum_length = None
                 if data_type in ('decimal', 'int'):
@@ -267,7 +267,6 @@ class Database:
                           numeric_precision,
                           numeric_scale)
                 columns.append(column)
-            print(columns)
             return columns
         except:
             logger.error("Failed generating db types from cursor description")

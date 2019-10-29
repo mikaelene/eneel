@@ -4,6 +4,7 @@ import psycopg2.extras
 from time import time
 from datetime import datetime
 import eneel.utils as utils
+import re
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -43,6 +44,27 @@ def run_export_query(server, user, password, database, port, query, file_path, d
         logger.error(e)
 
 
+def python_type_to_db_type(python_type):
+    if python_type == 'str':
+        return 'varchar'
+    elif python_type in ('bytes', 'bytearray'):
+        return 'bytea'
+    elif python_type == 'bool':
+        return 'bool'
+    elif python_type == 'datetime.date':
+        return 'date'
+    elif python_type == 'datetime.time':
+        return 'time'
+    elif python_type == 'datetime.datetime':
+        return 'timestamp'
+    elif python_type == 'int':
+        return 'int'
+    elif python_type == 'float':
+        return 'real'
+    elif python_type == 'decimal':
+        return 'numeric'
+    elif python_type == 'UUID.uuid':
+        return 'uuid'
 
 
 class Database:
@@ -167,6 +189,50 @@ class Database:
             return columns
         except:
             logger.error("Failed getting columns")
+
+    def query_columns(self, query):
+        try:
+            query = 'SELECT * FROM (' + query + ') q fetch first 1 row only'
+            self.execute(query)
+            data = self.fetchone()
+            cursor_columns = self.cursor.description
+
+        except:
+            logger.error("Failed getting query columns")
+            return
+        try:
+            columns = []
+            for i in range(len(cursor_columns)):
+                ordinal_position = i
+                column_name = cursor_columns[i][0]
+                data_type = re.findall(r"'(.+?)'", str(type(data[i])))[0]
+                print(data_type, cursor_columns[i][4])
+                if data_type == 'str':
+                    character_maximum_length = cursor_columns[i][3]
+                    if character_maximum_length == -1:
+                        data_type = 'text'
+                else:
+                    character_maximum_length = None
+                if data_type in ('decimal.Decimal', 'decimal', 'int'):
+                    numeric_precision = cursor_columns[i][4]
+                else:
+                    numeric_precision = None
+                if data_type in ('decimal.Decimal', 'decimal', 'int'):
+                    numeric_scale = cursor_columns[i][5]
+                else:
+                    numeric_scale = None
+                data_type = python_type_to_db_type(data_type)
+
+                column = (ordinal_position + 1,
+                          column_name,
+                          data_type,
+                          character_maximum_length,
+                          numeric_precision,
+                          numeric_scale)
+                columns.append(column)
+            return columns
+        except:
+            logger.error("Failed generating db types from cursor description")
 
     def check_table_exist(self, table_name):
         try:
