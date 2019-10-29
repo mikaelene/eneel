@@ -45,9 +45,9 @@ def run_export_query(server, user, password, database, port, query, file_path, d
 
 
 def python_type_to_db_type(python_type):
-    if python_type == 'str':
+    if python_type in ('str', 'unicode'):
         return 'varchar'
-    elif python_type in ('bytes', 'bytearray'):
+    elif python_type in ('bytes', 'bytearray', 'memoryview', 'buffer'):
         return 'bytea'
     elif python_type == 'bool':
         return 'bool'
@@ -57,14 +57,18 @@ def python_type_to_db_type(python_type):
         return 'time'
     elif python_type == 'datetime.datetime':
         return 'timestamp'
-    elif python_type == 'int':
+    elif python_type in ('int', 'long'):
         return 'int'
     elif python_type == 'float':
         return 'real'
-    elif python_type == 'decimal':
+    elif python_type in 'decimal.Decimal':
         return 'numeric'
     elif python_type == 'UUID.uuid':
         return 'uuid'
+    elif python_type == 'timedelta':
+        return 'interval'
+    else:
+        return python_type
 
 
 class Database:

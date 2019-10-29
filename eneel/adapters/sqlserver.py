@@ -94,10 +94,12 @@ def python_type_to_db_type(python_type):
         return 'int'
     elif python_type == 'float':
         return 'float'
-    elif python_type == 'decimal':
+    elif python_type == 'decimal.Decimal':
         return 'numeric'
     elif python_type == 'UUID.uuid':
         return 'UNIQUEIDENTIFIER'
+    else:
+        return python_type
 
 
 class Database:
