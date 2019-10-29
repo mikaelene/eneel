@@ -3,6 +3,7 @@ import pyodbc
 from time import time
 from datetime import datetime
 import eneel.utils as utils
+import re
 
 import logging
 logger = logging.getLogger('main_logger')
@@ -74,6 +75,29 @@ def run_export_query(driver, server, database, port, user, password, trusted_con
         db.close()
     except Exception as e:
         logger.error(e)
+
+
+def python_type_to_db_type(python_type):
+    if python_type == 'str':
+        return 'varchar'
+    elif python_type in ('bytes', 'bytearray'):
+        return 'binary'
+    elif python_type == 'bool':
+        return 'bit'
+    elif python_type == 'datetime.date':
+        return 'date'
+    elif python_type == 'datetime.time':
+        return 'time'
+    elif python_type == 'datetime.datetime':
+        return 'datetime2'
+    elif python_type == 'int':
+        return 'int'
+    elif python_type == 'float':
+        return 'float'
+    elif python_type == 'decimal':
+        return 'numeric'
+    elif python_type == 'UUID.uuid':
+        return 'UNIQUEIDENTIFIER'
 
 
 class Database:
@@ -209,6 +233,44 @@ class Database:
             return columns
         except:
             logger.error("Failed getting columns")
+
+    def query_columns(self, query):
+        try:
+            query = 'SELECT TOP 1 * FROM (' + query + ') q'
+            cursor_columns = self.execute(query).description
+        except:
+            logger.error("Failed getting query columns")
+        try:
+            columns = []
+            for column in cursor_columns:
+                ordinal_position = cursor_columns.index(column)
+                column_name = column[0]
+                data_type = re.findall(r"'(.+?)'", str(column[1]))[0]
+                if data_type == 'str':
+                    character_maximum_length = column[4]
+                else:
+                    character_maximum_length = None
+                if data_type in ('decimal', 'int'):
+                    numeric_precision = column[4]
+                else:
+                    numeric_precision = None
+                if data_type in ('decimal', 'int'):
+                    numeric_scale = column[5]
+                else:
+                    numeric_scale = None
+                data_type = python_type_to_db_type(data_type)
+
+                column = (ordinal_position + 1,
+                          column_name,
+                          data_type,
+                          character_maximum_length,
+                          numeric_precision,
+                          numeric_scale)
+                columns.append(column)
+            print(columns)
+            return columns
+        except:
+            logger.error("Failed generating db types from cursor description")
 
     def check_table_exist(self, table_name):
         try:

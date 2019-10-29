@@ -39,7 +39,7 @@ def connection_from_config(connection_info):
     read_only = connection_info.get('read_only')
     type = connection_info.get('type')
     table_parallel_loads = connection_info.get('credentials').get('table_parallel_loads', 10)
-    table_parallel_batch_size = connection_info.get('credentials').get('table_parallel_batch_size', 1)
+    table_parallel_batch_size = connection_info.get('credentials').get('table_parallel_batch_size', 1000000)
     #print(table_parallel_batch_size)
     if connection_info.get('type') == 'oracle':
         return oracle.Database(server, user, password, database, port, limit_rows, table_where_clause, read_only, table_parallel_loads, table_parallel_batch_size)
