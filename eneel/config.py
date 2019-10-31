@@ -136,6 +136,12 @@ class Project:
         return self
 
     def get_loads(self):
+        #loads = self.get_table_loads() + self.get_query_loads()
+        print(self.get_table_loads() + self.get_query_loads())
+        loads = self.get_table_loads()
+        return loads
+
+    def get_table_loads(self):
         # Lists of load settings
         load_orders = []
         project_names = []
@@ -178,7 +184,7 @@ class Project:
             for i in range(num_tables_to_load):
                 num_tables_to_loads.append(num_tables_to_load)
 
-        loads = [{'load_order': load_order,
+        table_loads = [{'load_order': load_order,
                   'num_tables_to_load': num_tables_to_load,
                   'project_name': project_name,
                   'source_conninfo': source_conninfo,
@@ -209,5 +215,77 @@ class Project:
                                       tables,
                                       temp_paths)]
 
-        return loads
+        return table_loads
 
+    def get_query_loads(self):
+        # Lists of load settings
+        load_orders = []
+        project_names = []
+        source_conninfos = []
+        target_conninfos = []
+        logdbs = []
+        projects = []
+        queries = []
+        target_tables = []
+        temp_paths = []
+
+        # Populate load settings
+        order_num = 1
+        for query in self.project_config['queries']:
+            source_conninfo_item = self.source_conninfo
+            target_conninfo_item = self.target_conninfo
+            logdb_item = self.logdb
+            project_item = self.project
+            query_item = query.get('query')
+            target_table = query.get('target_table')
+
+            load_orders.append(order_num)
+            order_num += 1
+            project_names.append(self.project_name)
+            source_conninfos.append(source_conninfo_item)
+            target_conninfos.append(target_conninfo_item)
+            logdbs.append(logdb_item)
+            projects.append(project_item)
+            queries.append(query_item)
+            target_tables.append(target_table)
+            temp_paths.append(self.temp_path)
+
+        # Number of loads
+        num_queries_to_load = len(queries)
+
+        num_queries_to_loads = []
+        for i in range(num_queries_to_load):
+            num_queries_to_loads.append(num_queries_to_load)
+
+        query_loads = [{'load_order': load_order,
+                  'num_queries_to_load': num_tables_to_load,
+                  'project_name': project_name,
+                  'source_conninfo': source_conninfo,
+                  'target_conninfo': target_conninfo,
+                  'logdb': logdb,
+                  'project': project,
+                  'query': query,
+                  'target_table': target_table,
+                  'temp_path': temp_path
+                  }
+                 for load_order,
+                     num_tables_to_load,
+                     project_name,
+                     source_conninfo,
+                     target_conninfo,
+                     logdb,
+                     project,
+                     query,
+                     target_table,
+                     temp_path in zip(load_orders,
+                                      num_queries_to_loads,
+                                      project_names,
+                                      source_conninfos,
+                                      target_conninfos,
+                                      logdbs,
+                                      projects,
+                                      queries,
+                                      target_tables,
+                                      temp_paths)]
+
+        return query_loads
