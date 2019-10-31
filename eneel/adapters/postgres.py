@@ -43,8 +43,8 @@ def run_export_query(server, user, password, database, port, query, file_path, d
                 logger.error(e)
                 db.close()
                 return rowcounts
-            except Exception as e:
-                logger.error(e)
+    except Exception as e:
+        logger.error(e)
 
 
 def python_type_to_db_type(python_type):
