@@ -13,15 +13,18 @@ def run_export_query(server, user, password, database, port, query, file_path, d
         db = Database(server, user, password, database, port)
         export = db.cursor.execute(query)
         rowcounts = 0
-        while rows:
+        while True:
             try:
-                rows = export.fetchmany(rows)
-            except:
+                fetched_rows = export.fetchmany(rows)
+                rowcount = utils.export_csv(fetched_rows, file_path, delimiter)
+                if not fetched_rows:
+                    db.close()
+                    return rowcounts
+                rowcounts = rowcounts + rowcount
+            except Exception as e:
+                logger.error(e)
+                db.close()
                 return rowcounts
-            rowcount = utils.export_csv(rows, file_path, delimiter)  # Method appends the rows in a file
-            rowcounts = rowcounts + rowcount
-        return rowcounts
-        db.close()
     except Exception as e:
         logger.error(e)
 
@@ -107,8 +110,9 @@ class Database:
         except cx_Oracle.Error as e:
             logger.error(e)
 
-    def fetchmany(self,rows):
+    def fetchmany(self, rows):
         try:
+            print('Entering fetchmany')
             return self.cursor.fetchmany(rows)
         except cx_Oracle.Error as e:
             logger.error(e)
