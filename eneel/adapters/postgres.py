@@ -213,7 +213,6 @@ class Database:
                 ordinal_position = i
                 column_name = cursor_columns[i][0]
                 data_type = re.findall(r"'(.+?)'", str(type(data[i])))[0]
-                #print(data_type, cursor_columns[i][4])
                 if data_type == 'str':
                     character_maximum_length = cursor_columns[i][3]
                     if character_maximum_length == -1:
@@ -340,9 +339,8 @@ class Database:
         return select_stmt
 
     def export_query(self, query, file_path, delimiter, rows=5000):
-        print(query)
         rowcounts = run_export_query(self._server, self._user, self._password, self._database, self._port, query, file_path,
-                         delimiter, rows=5000)
+                         delimiter, rows=rows)
         return rowcounts
 
     def insert_from_table_and_drop(self, schema, to_table, from_table):
@@ -438,7 +436,6 @@ class Database:
             table_exists = self.query("SELECT * FROM INFORMATION_SCHEMA.TABLES "
                                         "WHERE TABLE_SCHEMA = %s AND "
                                         "TABLE_NAME = %s", [schema, table])
-            #table_exists = self.fetchone()
 
             if table_exists:
                 self.execute("DROP TABLE " + schema + "." + table)

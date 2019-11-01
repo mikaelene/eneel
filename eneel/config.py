@@ -141,7 +141,6 @@ class Project:
         query_loads = self.get_query_loads()
         #print(self.get_table_loads() + self.get_query_loads())
         loads = table_loads + query_loads
-        print(loads)
         #loads = table_loads
         return loads
 
@@ -313,5 +312,4 @@ class Project:
                                           target_schemas,
                                           target_tables,
                                           temp_paths)]
-            #print(query_loads)
             return query_loads
