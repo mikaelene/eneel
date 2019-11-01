@@ -309,6 +309,63 @@ def strategy_full_table_load(return_code, index, total, source, source_schema, s
         return return_code, export_row_count, import_row_count
 
 
+def strategy_full_query_load(return_code, index, total, source, query, columns, temp_path_load, csv_delimiter, target,
+                             full_target_table, parallelization_key):
+    export_row_count = None
+    import_row_count = None
+
+    try:
+        # Temp table
+        target_table_tmp = full_target_table + '_tmp'
+
+        # Full source table
+        full_source_table = source_schema + '.' + source_table
+
+        # Export table
+        return_code, temp_path_load, delimiter, export_row_count = export_table(return_code,
+                                                                                index,
+                                                                                total,
+                                                                                source,
+                                                                                source_schema,
+                                                                                source_table,
+                                                                                columns,
+                                                                                temp_path_load,
+                                                                                csv_delimiter,
+                                                                                replication_key=None,
+                                                                                max_replication_key=None,
+                                                                                parallelization_key=parallelization_key)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
+
+        # Create temp table
+        return_code = create_temp_table(return_code, index, total, target, target_schema, target_table_tmp, columns,
+                                        full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
+
+        # Import into temp table
+        return_code, import_row_count = import_into_temp_table(return_code, index, total, target, target_schema,
+                                                               target_table_tmp, temp_path_load, delimiter,
+                                                               full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
+
+        # Switch tables
+        return_code = switch_table(return_code, index, total, target, target_schema, target_table, target_table_tmp,
+                                   full_source_table)
+        if return_code == 'ERROR':
+            return return_code, export_row_count, import_row_count
+
+        # Return success
+        if return_code == 'RUN':
+            return_code = 'DONE'
+
+    except:
+        printer.print_load_line(index, total, return_code, full_source_table, msg="load failed")
+    finally:
+        return return_code, export_row_count, import_row_count
+
+
 def strategy_incremental(return_code, index, total, source, source_schema, source_table, columns, temp_path_load,
                          csv_delimiter, target, target_schema, target_table, replication_key=None,
                          parallelization_key=None):
@@ -398,15 +455,16 @@ def strategy_incremental(return_code, index, total, source, source_schema, sourc
 
 
 def run_load(project_load):
-    # Project and load info
+    # Common attributes
     load_order = project_load.get('load_order')
     num_tables_to_load = project_load.get('num_tables_to_load')
     project_name = project_load.get('project_name')
     project_started_at = project_load.get('project_started_at')
     project = project_load.get('project')
     temp_path = project_load.get('temp_path')
-    schema = project_load.get('schema')
-    table = project_load.get('table')
+    index = load_order
+    total = num_tables_to_load
+
     # Connections info
     source_conninfo = project_load.get('source_conninfo')
     target_conninfo = project_load.get('target_conninfo')
@@ -435,109 +493,228 @@ def run_load(project_load):
     source = config.connection_from_config(source_conninfo)
     target = config.connection_from_config(target_conninfo)
 
-    # Load details
     csv_delimiter = project.get('csv_delimiter', '|')
-    source_schema = schema.get('source_schema')
-    target_schema = schema.get('target_schema')
-    source_table = table.get('table_name')
-    full_source_table = source_schema + '.' + source_table
-    target_table = schema.get('table_prefix', "") + table.get('table_name') + schema.get('table_suffix', "")
-    full_target_table = target_schema + '.' + target_table
-    index = load_order
-    total = num_tables_to_load
 
-    # If source doesn't exist
-    if not source.check_table_exist(full_source_table):
-        printer.print_load_line(index, total, "ERROR", full_source_table, msg="does not exist in source")
-        return return_code
+    if project_load.get('schema'):
+        # Project and load info
 
-    # Temp path for specific load
-    temp_path_schema = os.path.join(temp_path, source_schema)
-    temp_path_load = os.path.join(temp_path_schema, source_table)
-    utils.delete_path(temp_path_load)
-    utils.create_path(temp_path_load)
+        schema = project_load.get('schema')
+        table = project_load.get('table')
 
-    # Source column types to exclude
-    source_columntypes_to_exclude = project.get('source_columntypes_to_exclude')
-    if source_columntypes_to_exclude:
-        source_columntypes_to_exclude = source_columntypes_to_exclude.lower().replace(" ", "").split(",")
+        # Load details
+        source_schema = schema.get('source_schema')
+        target_schema = schema.get('target_schema')
+        source_table = table.get('table_name')
+        full_source_table = source_schema + '.' + source_table
+        target_table = schema.get('table_prefix', "") + table.get('table_name') + schema.get('table_suffix', "")
+        full_target_table = target_schema + '.' + target_table
 
-    # Columns to load
-    try:
-        columns = source.table_columns(source_schema, source_table)
+
+        # If source doesn't exist
+        if not source.check_table_exist(full_source_table):
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="does not exist in source")
+            return return_code
+
+        # Temp path for specific load
+        temp_path_schema = os.path.join(temp_path, source_schema)
+        temp_path_load = os.path.join(temp_path_schema, source_table)
+        utils.delete_path(temp_path_load)
+        utils.create_path(temp_path_load)
+
+        # Source column types to exclude
+        source_columntypes_to_exclude = project.get('source_columntypes_to_exclude')
         if source_columntypes_to_exclude:
-            columns_to_load = columns.copy()
-            for col in columns:
-                data_type = col[2].lower()
-                if data_type in source_columntypes_to_exclude:
-                    columns_to_load.remove(col)
-            columns = columns_to_load
-    except:
-        logger.error("Could not determine columns to load")
-        return return_code
+            source_columntypes_to_exclude = source_columntypes_to_exclude.lower().replace(" ", "").split(",")
 
-    # Load type and settings
-    replication_method = table.get('replication_method', 'FULL_TABLE')
-    parallelization_key = table.get('parallelization_key')
-    replication_key = table.get('replication_key')
+        # Columns to load
+        try:
+            columns = source.table_columns(source_schema, source_table)
+            if source_columntypes_to_exclude:
+                columns_to_load = columns.copy()
+                for col in columns:
+                    data_type = col[2].lower()
+                    if data_type in source_columntypes_to_exclude:
+                        columns_to_load.remove(col)
+                columns = columns_to_load
+        except:
+            logger.error("Could not determine columns to load")
+            return return_code
 
-    index = load_order
-    total = num_tables_to_load
-    return_code = "START"
-    table_msg = full_source_table + " (" + replication_method + ")"
-    printer.print_load_line(index, total, return_code, table_msg)
+        # Load type and settings
+        replication_method = table.get('replication_method', 'FULL_TABLE')
+        parallelization_key = table.get('parallelization_key')
+        replication_key = table.get('replication_key')
 
-    # Full table load
-    if not replication_method or replication_method == "FULL_TABLE":
-        return_code, export_row_count, import_row_count = strategy_full_table_load(return_code, index, total, source,
+        return_code = "START"
+        table_msg = full_source_table + " (" + replication_method + ")"
+        printer.print_load_line(index, total, return_code, table_msg)
+
+        # Full table load
+        if not replication_method or replication_method == "FULL_TABLE":
+            return_code, export_row_count, import_row_count = strategy_full_table_load(return_code, index, total, source,
+                                                                                       source_schema, source_table, columns,
+                                                                                       temp_path_load, csv_delimiter,
+                                                                                       target, target_schema, target_table,
+                                                                                       parallelization_key=parallelization_key)
+
+        # Incremental replication
+        elif replication_method == "INCREMENTAL":
+            return_code, export_row_count, import_row_count = strategy_incremental(return_code, index, total, source,
                                                                                    source_schema, source_table, columns,
-                                                                                   temp_path_load, csv_delimiter,
-                                                                                   target, target_schema, target_table,
+                                                                                   temp_path_load, csv_delimiter, target,
+                                                                                   target_schema, target_table,
+                                                                                   replication_key=replication_key,
                                                                                    parallelization_key=parallelization_key)
 
-    # Incremental replication
-    elif replication_method == "INCREMENTAL":
-        return_code, export_row_count, import_row_count = strategy_incremental(return_code, index, total, source,
-                                                                               source_schema, source_table, columns,
-                                                                               temp_path_load, csv_delimiter, target,
-                                                                               target_schema, target_table,
-                                                                               replication_key=replication_key,
-                                                                               parallelization_key=parallelization_key)
+        else:
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication_method not valid")
+            return return_code
 
-    else:
-        printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication_method not valid")
+        # delete temp folder
+        if not project.get('keep_tempfiles', False):
+            utils.delete_path(temp_path_load)
+
+        # Close connections
+        source.close()
+        target.close()
+
+        # Load end, and execution time
+        end_time = time()
+        execution_time = end_time - load_start_time
+
+        printer.print_load_line(index, total, return_code, full_source_table, str(import_row_count), execution_time)
+
+        if logdb_conninfo:
+            logdb = config.connection_from_config(logdb_conninfo)
+
+            load_started_at = datetime.fromtimestamp(load_start_time)
+            load_ended_at = datetime.fromtimestamp(end_time)
+            logdb.log(logdb_schema, logdb_table,
+                      project=project_name,
+                      project_started_at=project_started_at,
+                      source_table=full_source_table,
+                      target_table=full_target_table,
+                      started_at=load_started_at,
+                      ended_at=load_ended_at,
+                      status=return_code,
+                      exported_rows=export_row_count,
+                      imported_rows=import_row_count)
+            logdb.close()
+
         return return_code
 
-    # delete temp folder
-    if not project.get('keep_tempfiles', False):
+    # QUERIES
+    if project_load.get('query'):
+        #print(project_load.get('query'))
+
+
+        # Load details
+        query_item = project_load.get('query')
+        query_name = query_item.get('query_name')
+        query = query_item.get('query')
+        table_name = query_item.get('table_name')
+
+        print(query)
+        print(table_name)
+
+
+        # If source doesn't exist
+        #if not source.check_table_exist(full_source_table):
+        #    printer.print_load_line(index, total, "ERROR", full_source_table, msg="does not exist in source")
+        #    return return_code
+
+        # Temp path for specific load
+        temp_path_schema = os.path.join(temp_path, 'queries')
+        temp_path_load = os.path.join(temp_path_schema, query_name)
         utils.delete_path(temp_path_load)
+        utils.create_path(temp_path_load)
 
-    # Close connections
-    source.close()
-    target.close()
+        # Source column types to exclude
+        #source_columntypes_to_exclude = project.get('source_columntypes_to_exclude')
+        #if source_columntypes_to_exclude:
+        #    source_columntypes_to_exclude = source_columntypes_to_exclude.lower().replace(" ", "").split(",")
 
-    # Load end, and execution time
-    end_time = time()
-    execution_time = end_time - load_start_time
+        # Columns to load
+        #try:
+        #    columns = source.table_columns(source_schema, source_table)
+        #    if source_columntypes_to_exclude:
+        #        columns_to_load = columns.copy()
+        #        for col in columns:
+        #            data_type = col[2].lower()
+        #            if data_type in source_columntypes_to_exclude:
+        #                columns_to_load.remove(col)
+        #        columns = columns_to_load
+        #except:
+        #    logger.error("Could not determine columns to load")
+        #    return return_code
 
-    printer.print_load_line(index, total, return_code, full_source_table, str(import_row_count), execution_time)
+        # Columns to load
+        columns = source.query_columns(query)
+        print(columns)
 
-    if logdb_conninfo:
-        logdb = config.connection_from_config(logdb_conninfo)
 
-        load_started_at = datetime.fromtimestamp(load_start_time)
-        load_ended_at = datetime.fromtimestamp(end_time)
-        logdb.log(logdb_schema, logdb_table,
-                  project=project_name,
-                  project_started_at=project_started_at,
-                  source_table=full_source_table,
-                  target_table=full_target_table,
-                  started_at=load_started_at,
-                  ended_at=load_ended_at,
-                  status=return_code,
-                  exported_rows=export_row_count,
-                  imported_rows=import_row_count)
-        logdb.close()
 
-    return return_code
+        # Load type and settings
+        replication_method = project_load.get('replication_method', 'FULL_TABLE')
+        parallelization_key = project_load.get('parallelization_key')
+        replication_key = project_load.get('replication_key')
 
+        print(replication_method)
+        return_code = "START"
+        #table_msg = full_source_table + " (" + replication_method + ")"
+        #printer.print_load_line(index, total, return_code, table_msg)
+
+        return
+        # Full table load
+        if not replication_method or replication_method == "FULL_TABLE":
+            return_code, export_row_count, import_row_count = strategy_full_query_load(return_code, index, total, source,
+                                                                                       query, columns, temp_path_load,
+                                                                                       csv_delimiter, target,
+                                                                                       full_target_table,
+                                                                                       parallelization_key=parallelization_key)
+
+        # Incremental replication
+        elif replication_method == "INCREMENTAL":
+            return_code, export_row_count, import_row_count = strategy_incremental(return_code, index, total, source,
+                                                                                   source_schema, source_table, columns,
+                                                                                   temp_path_load, csv_delimiter, target,
+                                                                                   target_schema, target_table,
+                                                                                   replication_key=replication_key,
+                                                                                   parallelization_key=parallelization_key)
+
+        else:
+            printer.print_load_line(index, total, "ERROR", full_source_table, msg="replication_method not valid")
+            return return_code
+
+        # delete temp folder
+        if not project.get('keep_tempfiles', False):
+            utils.delete_path(temp_path_load)
+
+        # Close connections
+        source.close()
+        target.close()
+
+        # Load end, and execution time
+        end_time = time()
+        execution_time = end_time - load_start_time
+
+        printer.print_load_line(index, total, return_code, full_source_table, str(import_row_count), execution_time)
+
+        if logdb_conninfo:
+            logdb = config.connection_from_config(logdb_conninfo)
+
+            load_started_at = datetime.fromtimestamp(load_start_time)
+            load_ended_at = datetime.fromtimestamp(end_time)
+            logdb.log(logdb_schema, logdb_table,
+                      project=project_name,
+                      project_started_at=project_started_at,
+                      source_table=full_source_table,
+                      target_table=full_target_table,
+                      started_at=load_started_at,
+                      ended_at=load_ended_at,
+                      status=return_code,
+                      exported_rows=export_row_count,
+                      imported_rows=import_row_count)
+            logdb.close()
+
+        return return_code

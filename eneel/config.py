@@ -119,7 +119,8 @@ class Project:
             self.logdb = None
 
         self.project = self.project_config.copy()
-        del self.project['schemas']
+        self.project.pop('schemas', None)
+        self.project.pop('queries', None)
 
         self.temp_path = self.project.get('temp_path', 'temp')
         self.temp_path = os.path.join(self.temp_path , project_name)
@@ -136,12 +137,18 @@ class Project:
         return self
 
     def get_loads(self):
-        #loads = self.get_table_loads() + self.get_query_loads()
-        print(self.get_table_loads() + self.get_query_loads())
-        loads = self.get_table_loads()
+        table_loads = self.get_table_loads()
+        query_loads = self.get_query_loads()
+        #print(self.get_table_loads() + self.get_query_loads())
+        loads = table_loads + query_loads
+        print(loads)
+        #loads = table_loads
         return loads
 
     def get_table_loads(self):
+        config_schemas = self.project_config['schemas']
+        if not config_schemas:
+            return []
         # Lists of load settings
         load_orders = []
         project_names = []
@@ -155,7 +162,7 @@ class Project:
 
         # Populate load settings
         order_num = 1
-        for schema_config in self.project_config['schemas']:
+        for schema_config in config_schemas:
             schema = schema_config.copy()
             del schema['tables']
             for table in schema_config['tables']:
@@ -214,10 +221,15 @@ class Project:
                                       schemas,
                                       tables,
                                       temp_paths)]
-
+        #print(table_loads)
         return table_loads
 
     def get_query_loads(self):
+        config_queries = self.project_config.get('queries')
+        #print(config_queries)
+        if not config_queries:
+            return []
+
         # Lists of load settings
         load_orders = []
         project_names = []
@@ -226,66 +238,80 @@ class Project:
         logdbs = []
         projects = []
         queries = []
+        target_schemas = []
         target_tables = []
         temp_paths = []
 
+
+
+        ## Populate load settings
+        #order_num = 1
+        #for query in config_queries:
+
         # Populate load settings
         order_num = 1
-        for query in self.project_config['queries']:
-            source_conninfo_item = self.source_conninfo
-            target_conninfo_item = self.target_conninfo
-            logdb_item = self.logdb
-            project_item = self.project
-            query_item = query.get('query')
-            target_table = query.get('target_table')
+        for query_config in config_queries:
+            query = query_config.copy()
+            target_schema = query['target_schema']
+            del query['queries']
+            for query in query_config['queries']:
+                source_conninfo_item = self.source_conninfo
+                target_conninfo_item = self.target_conninfo
+                logdb_item = self.logdb
+                project_item = self.project
+                query_item = query
+                target_table = query_config.get('target_table')
 
-            load_orders.append(order_num)
-            order_num += 1
-            project_names.append(self.project_name)
-            source_conninfos.append(source_conninfo_item)
-            target_conninfos.append(target_conninfo_item)
-            logdbs.append(logdb_item)
-            projects.append(project_item)
-            queries.append(query_item)
-            target_tables.append(target_table)
-            temp_paths.append(self.temp_path)
+                load_orders.append(order_num)
+                order_num += 1
+                project_names.append(self.project_name)
+                source_conninfos.append(source_conninfo_item)
+                target_conninfos.append(target_conninfo_item)
+                logdbs.append(logdb_item)
+                projects.append(project_item)
+                queries.append(query_item)
+                target_schemas.append(target_schema)
+                target_tables.append(target_table)
+                temp_paths.append(self.temp_path)
 
-        # Number of loads
-        num_queries_to_load = len(queries)
+            # Number of loads
+            num_tables_to_load = len(queries)
 
-        num_queries_to_loads = []
-        for i in range(num_queries_to_load):
-            num_queries_to_loads.append(num_queries_to_load)
+            num_tables_to_loads = []
+            for i in range(num_tables_to_load):
+                num_tables_to_loads.append(num_tables_to_load)
 
-        query_loads = [{'load_order': load_order,
-                  'num_queries_to_load': num_tables_to_load,
-                  'project_name': project_name,
-                  'source_conninfo': source_conninfo,
-                  'target_conninfo': target_conninfo,
-                  'logdb': logdb,
-                  'project': project,
-                  'query': query,
-                  'target_table': target_table,
-                  'temp_path': temp_path
-                  }
-                 for load_order,
-                     num_tables_to_load,
-                     project_name,
-                     source_conninfo,
-                     target_conninfo,
-                     logdb,
-                     project,
-                     query,
-                     target_table,
-                     temp_path in zip(load_orders,
-                                      num_queries_to_loads,
-                                      project_names,
-                                      source_conninfos,
-                                      target_conninfos,
-                                      logdbs,
-                                      projects,
-                                      queries,
-                                      target_tables,
-                                      temp_paths)]
-
-        return query_loads
+            query_loads = [{'load_order': load_order,
+                            'num_tables_to_load': num_tables_to_load,
+                            'project_name': project_name,
+                            'source_conninfo': source_conninfo,
+                            'target_conninfo': target_conninfo,
+                            'project': project,
+                            'query': query,
+                            'target_schema': target_schema,
+                            'target_table': target_table,
+                            'temp_path': temp_path
+                            }
+                     for load_order,
+                         num_tables_to_load,
+                         project_name,
+                         source_conninfo,
+                         target_conninfo,
+                         logdb,
+                         project,
+                         query,
+                         target_schema,
+                         target_table,
+                         temp_path in zip(load_orders,
+                                          num_tables_to_loads,
+                                          project_names,
+                                          source_conninfos,
+                                          target_conninfos,
+                                          logdbs,
+                                          projects,
+                                          queries,
+                                          target_schemas,
+                                          target_tables,
+                                          temp_paths)]
+            #print(query_loads)
+            return query_loads

@@ -213,7 +213,7 @@ class Database:
                 ordinal_position = i
                 column_name = cursor_columns[i][0]
                 data_type = re.findall(r"'(.+?)'", str(type(data[i])))[0]
-                print(data_type, cursor_columns[i][4])
+                #print(data_type, cursor_columns[i][4])
                 if data_type == 'str':
                     character_maximum_length = cursor_columns[i][3]
                     if character_maximum_length == -1:
