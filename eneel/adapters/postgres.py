@@ -340,6 +340,7 @@ class Database:
         return select_stmt
 
     def export_query(self, query, file_path, delimiter, rows=5000):
+        print(query)
         rowcounts = run_export_query(self._server, self._user, self._password, self._database, self._port, query, file_path,
                          delimiter, rows=5000)
         return rowcounts
