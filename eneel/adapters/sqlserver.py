@@ -569,11 +569,9 @@ class Database:
             create_table_sql = create_table_sql[:-3]
             create_table_sql += ")"
 
-            print(create_table_sql)
-
             return create_table_sql
         except Exception as e:
-            print(e)
+            logger.error(e)
             logger.error("Failed generating create table script")
 
     def create_table_from_columns(self, schema, table, columns):

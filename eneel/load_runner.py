@@ -873,7 +873,6 @@ def run_load(project_load):
         except:
             logger.error("Could not determine columns to load")
             return return_code
-        print(columns)
 
         # Load type and settings
         replication_method = table.get("replication_method", "FULL_TABLE")
@@ -993,7 +992,6 @@ def run_load(project_load):
 
         # Columns to load
         columns = source.query_columns(query)
-        print(columns)
 
         # Load type and settings
         replication_method = query_item.get("replication_method", "FULL_TABLE")

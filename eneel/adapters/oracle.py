@@ -125,7 +125,6 @@ class Database:
 
     def fetchmany(self, rows):
         try:
-            print("Entering fetchmany")
             return self.cursor.fetchmany(rows)
         except cx_Oracle.Error as e:
             logger.error(e)
@@ -161,15 +160,12 @@ class Database:
     def query_columns(self, query):
         try:
             query = "SELECT * FROM (" + query + ") q WHERE ROWNUM <= 1"
-            print(query)
             self.execute(query)
             data = self.fetchone()
             cursor_columns = self.cursor.description
-            print(cursor_columns)
-            print(data)
 
         except Exception as e:
-            print(e)
+            logger.error(e)
             logger.error("Failed getting query columns")
             return
         try:
