@@ -33,9 +33,11 @@ def run_export_query(
         logger.error(e)
 
 
-def NumbersAsDecimal(cursor, name, defaultType, size, precision, scale):
+def output_type_handler(cursor, name, defaultType, size, precision, scale):
     if defaultType == cx_Oracle.NUMBER:
         return cursor.var(str, 100, cursor.arraysize, outconverter=decimal.Decimal)
+    if defaultType == cx_Oracle.CLOB:
+        return cursor.var(cx_Oracle.LONG_STRING, arraysize=cursor.arraysize)
 
 
 class Database:
@@ -70,7 +72,7 @@ class Database:
             os.environ["NLS_LANG"] = "AMERICAN_AMERICA.WE8ISO8859P1"
             self._conn = cx_Oracle.connect(user, password, server_db)
 
-            self._conn.outputtypehandler = NumbersAsDecimal
+            self._conn.outputtypehandler = output_type_handler
 
             self._cursor = self._conn.cursor()
             logger.debug("Connection to oracle successful")
@@ -173,16 +175,21 @@ class Database:
                 character_maximum_length = None
                 numeric_precision = None
                 numeric_scale = None
-                if data_type in ("cx_Oracle.CLOB", "cx_Oracle.BLOB", "cx_Oracle.OBJECT", "cx_Oracle.BFILE", "cx_Oracle.NCLOB"):
+                if data_type in ("cx_Oracle.BLOB", "cx_Oracle.OBJECT", "cx_Oracle.BFILE", "cx_Oracle.NCLOB"):
                     data_type = "bytes"
                 elif data_type in ("cx_Oracle.DATETIME", "cx_Oracle.TIMESTAMP"):
                     data_type = "datetime.datetime"
                 elif data_type == "cx_Oracle.STRING":
                     data_type = "str"
                     character_maximum_length = column[3]
+                elif data_type == "cx_Oracle.CLOB":
+                    data_type = "str"
+                    character_maximum_length = -1
                 elif data_type in ("cx_Oracle.NUMBER"):
-                    if column[4] <= 0:
+                    if column[5] == 0:
                         data_type = "int"
+                    elif column[5] < 0:
+                        data_type = "float"
                     else:
                         data_type = "decimal.Decimal"
                         numeric_precision = column[4]
@@ -203,13 +210,6 @@ class Database:
             logger.error(e)
             logger.error("Failed generating db types from cursor description")
 
-
-
-      #          if data_type in ("cx_Oracle.LOB", "cx_Oracle.Object"):
-      #              data_type = "bytes"
-      #          if data_type == "str":
-      #              character_maximum_length = cursor_columns[i][3]
-
     def remove_unsupported_columns(self, columns):
         columns_to_keep = columns.copy()
         for column in columns:
@@ -217,7 +217,7 @@ class Database:
             character_maximum_length = column[3]
             if data_type == 'str' and character_maximum_length > 8000:
                 columns_to_keep.remove(column)
-            if data_type == 'bytearray':
+            if data_type in ('bytearray'):
                 columns_to_keep.remove(column)
         return columns_to_keep
 

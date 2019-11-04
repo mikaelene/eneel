@@ -81,15 +81,15 @@ def run_cmd(cmd, envs=None):
         return -1, sys.exc_info()[0]
 
 
-def export_csv(rows, filename, delimiter="|"):
+def export_csv(rows, filename, delimiter='|'):
     try:
-        csv_file = open(filename, "a")
+        csv_file = open(filename, 'a')
         for row in rows:
-            csv_row = ""
+            csv_row = ''
             for i in range(len(row)):
                 col = row[i]
                 if col is None:
-                    col = ""
+                    col = ''
                 if col is True:
                     col = 1
                 if col is False:
@@ -100,8 +100,9 @@ def export_csv(rows, filename, delimiter="|"):
                     col = str(col).strip()
                 csv_row += col
             # Replace linebreaks if any
-            #csv_row.replace('\n', '')
-            csv_file.write(csv_row + "\n")
+            csv_row = csv_row.replace('\n', ' ')
+            csv_row = csv_row.replace('\r', ' ')
+            csv_file.write(csv_row + '\n')
         csv_file.close()
         rowcount = len(rows)
         # logger.info(str(rowcount) + " rows added to " + filename)
