@@ -194,9 +194,13 @@ class Project:
     def get_loads(self):
         table_loads = self.get_table_loads()
         query_loads = self.get_query_loads()
-        # print(self.get_table_loads() + self.get_query_loads())
         loads = table_loads + query_loads
-        # loads = table_loads
+        num_tables_to_load = len(loads)
+        load_order = 1
+        for load in loads:
+            load.update(num_tables_to_load=num_tables_to_load)
+            load.update(load_order=load_order)
+            load_order += 1
         return loads
 
     def get_table_loads(self):
