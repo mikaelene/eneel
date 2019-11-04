@@ -199,26 +199,9 @@ class Database:
             logger.error("Failed getting tables")
 
     def table_columns(self, schema, table):
-        try:
-            q = """
-                SELECT  
-                      ordinal_position,
-                      column_name,
-                      data_type,
-                      character_maximum_length,
-                      numeric_precision,
-                      numeric_scale
-                FROM information_schema.columns
-                WHERE 
-                    --table_schema + '.' + table_name = ?
-                    table_schema = %s
-                    and table_name = %s
-                    order by ordinal_position
-            """
-            columns = self.query(q, [schema, table])
-            return columns
-        except:
-            logger.error("Failed getting columns")
+        query = "SELECT * FROM " + schema + "." + table
+        columns = self.query_columns(query)
+        return columns
 
     def query_columns(self, query):
         try:
@@ -238,8 +221,8 @@ class Database:
                 data_type = re.findall(r"'(.+?)'", str(type(data[i])))[0]
                 if data_type == "str":
                     character_maximum_length = cursor_columns[i][3]
-                    if character_maximum_length == -1:
-                        data_type = "text"
+                #    if character_maximum_length == -1:
+                #        data_type = "text"
                 else:
                     character_maximum_length = None
                 if data_type in ("decimal.Decimal", "decimal", "int"):
@@ -250,7 +233,7 @@ class Database:
                     numeric_scale = cursor_columns[i][5]
                 else:
                     numeric_scale = None
-                data_type = python_type_to_db_type(data_type)
+                # data_type = python_type_to_db_type(data_type)
 
                 column = (
                     ordinal_position + 1,
@@ -466,37 +449,44 @@ class Database:
 
                 ordinal_position = col[0]
                 column_name = col[1]
-                data_type = col[2].lower()
+                data_type = col[2]
+                data_type = python_type_to_db_type(data_type)
                 character_maximum_length = col[3]
                 numeric_precision = col[4]
                 numeric_scale = col[5]
 
-                column = column_name + " " + data_type
-                if "varchar2" in data_type:
-                    column = column_name + " " + "varchar"
-                if "char" in data_type:
-                    column += "("
+                if data_type == "varchar":
                     if character_maximum_length == -1:
-                        column += "max"
+                        column = column_name + " text"
                     else:
-                        column += str(character_maximum_length)
-                    column += ")"
-                elif "numeric" in data_type:
-                    column += (
-                        "(" + str(numeric_precision) + "," + str(numeric_scale) + ")"
+                        column = (
+                            column_name
+                            + " varchar"
+                            + "("
+                            + str(character_maximum_length)
+                            + ")"
+                        )
+                elif data_type == "numeric":
+                    column = (
+                        column_name
+                        + " numeric("
+                        + str(numeric_precision)
+                        + ","
+                        + str(numeric_scale)
+                        + ")"
                     )
-                elif "number" in data_type:
-                    column = column_name + " " + "numeric"
-                elif data_type == "USER-DEFINED":
-                    column = column_name + " TEXT"
-                elif data_type == "ARRAY":
-                    column = column_name + " TEXT"
+                else:
+                    column = column_name + " " + data_type
+
                 create_table_sql += column + ", \n"
             create_table_sql = create_table_sql[:-3]
             create_table_sql += ")"
 
+            print(create_table_sql)
+
             return create_table_sql
-        except:
+        except Exception as e:
+            print(e)
             logger.error("Failed generating create table script")
 
     def create_table_from_columns(self, schema, table, columns):

@@ -119,17 +119,17 @@ def run_export_query(
 def python_type_to_db_type(python_type):
     if python_type == "str":
         return "varchar"
-    elif python_type in ("bytes", "bytearray"):
+    elif python_type in ("bytes", "bytearray", "memoryview", "buffer"):
         return "binary"
     elif python_type == "bool":
         return "bit"
     elif python_type == "datetime.date":
         return "date"
-    elif python_type == "datetime.time":
+    elif python_type in ("datetime.time", "timedelta"):
         return "time"
     elif python_type == "datetime.datetime":
         return "datetime2"
-    elif python_type == "int":
+    elif python_type in ("int", "long"):
         return "int"
     elif python_type == "float":
         return "float"
@@ -276,26 +276,9 @@ class Database:
             logger.error("Failed getting tables")
 
     def table_columns(self, schema, table):
-        try:
-            q = """
-                SELECT  
-                      ordinal_position,
-                      column_name,
-                      data_type,
-                      character_maximum_length,
-                      numeric_precision,
-                      numeric_scale
-                FROM information_schema.columns
-                WHERE 
-                    --table_schema + '.' + table_name = ?
-                    table_schema = ?
-                    and table_name = ?
-                    order by ordinal_position
-            """
-            columns = self.query(q, [schema, table])
-            return columns
-        except:
-            logger.error("Failed getting columns")
+        query = "SELECT * FROM " + schema + "." + table
+        columns = self.query_columns(query)
+        return columns
 
     def query_columns(self, query):
         try:
@@ -303,6 +286,7 @@ class Database:
             cursor_columns = self.execute(query).description
         except:
             logger.error("Failed getting query columns")
+            return
         try:
             columns = []
             for column in cursor_columns:
@@ -313,15 +297,15 @@ class Database:
                     character_maximum_length = column[3]
                 else:
                     character_maximum_length = None
-                if data_type in ("decimal", "int"):
+                if data_type in ("decimal.Decimal", "decimal", "int"):
                     numeric_precision = column[4]
                 else:
                     numeric_precision = None
-                if data_type in ("decimal", "int"):
+                if data_type in ("decimal.Decimal", "decimal", "int"):
                     numeric_scale = column[5]
                 else:
                     numeric_scale = None
-                data_type = python_type_to_db_type(data_type)
+                # data_type = python_type_to_db_type(data_type)
 
                 column = (
                     ordinal_position + 1,
@@ -552,57 +536,44 @@ class Database:
 
                 ordinal_position = col[0]
                 column_name = "[" + col[1] + "]"
-                data_type = col[2].lower()
+                data_type = col[2]
+                data_type = python_type_to_db_type(data_type)
                 character_maximum_length = col[3]
                 numeric_precision = col[4]
                 numeric_scale = col[5]
 
-                if "char" in data_type:
-                    db_data_type = "VARCHAR" + "("
+                if data_type == "varchar":
                     if character_maximum_length == -1:
-                        db_data_type += "max"
+                        column = column_name + " varchar(MAX)"
                     else:
-                        db_data_type += str(character_maximum_length)
-                    db_data_type += ")"
-                elif (
-                    "numeric" in data_type
-                    or "number" in data_type
-                    or "decimal" in data_type
-                ):
-                    if numeric_scale:
-                        db_data_type = (
-                            "NUMERIC"
+                        column = (
+                            column_name
+                            + " varchar"
                             + "("
-                            + str(numeric_precision)
-                            + ","
-                            + str(numeric_scale)
+                            + str(character_maximum_length)
                             + ")"
                         )
-                    elif numeric_precision:
-                        db_data_type = "NUMERIC" + "(" + str(numeric_precision) + ")"
-                    else:
-                        db_data_type = "FLOAT"
-                elif "time zone" in data_type:
-                    db_data_type = "DATETIME2"
-                elif "timestamp" in data_type:
-                    db_data_type = "DATETIME2"
-                elif "bool" in data_type:
-                    db_data_type = "INT"
-                elif "clob" in data_type:
-                    db_data_type = "VARCHAR(MAX)"
+                elif data_type == "numeric":
+                    column = (
+                        column_name
+                        + " numeric("
+                        + str(numeric_precision)
+                        + ","
+                        + str(numeric_scale)
+                        + ")"
+                    )
                 else:
-                    db_data_type = data_type
+                    column = column_name + " " + data_type
 
-                column = column_name + " " + db_data_type
                 create_table_sql += column + ", \n"
-
             create_table_sql = create_table_sql[:-3]
             create_table_sql += ")"
 
-            logger.debug(create_table_sql)
+            print(create_table_sql)
 
             return create_table_sql
-        except:
+        except Exception as e:
+            print(e)
             logger.error("Failed generating create table script")
 
     def create_table_from_columns(self, schema, table, columns):

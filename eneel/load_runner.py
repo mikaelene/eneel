@@ -224,13 +224,7 @@ def export_table(
         else:
 
             file_name = (
-                source._database
-                + "_"
-                + source_schema
-                + "_"
-                + source_table
-                + "_"
-                + ".csv"
+                source._database + "_" + source_schema + "_" + source_table + ".csv"
             )
             file_path = os.path.join(temp_path_load, file_name)
 
@@ -266,6 +260,7 @@ def export_query(
     csv_delimiter,
     parallelization_key=None,
 ):
+    total_row_count = 0
     # Export table
     try:
         if parallelization_key:
@@ -870,13 +865,15 @@ def run_load(project_load):
             if source_columntypes_to_exclude:
                 columns_to_load = columns.copy()
                 for col in columns:
-                    data_type = col[2].lower()
+                    # data_type = col[2].lower()
+                    data_type = col[2]
                     if data_type in source_columntypes_to_exclude:
                         columns_to_load.remove(col)
                 columns = columns_to_load
         except:
             logger.error("Could not determine columns to load")
             return return_code
+        print(columns)
 
         # Load type and settings
         replication_method = table.get("replication_method", "FULL_TABLE")

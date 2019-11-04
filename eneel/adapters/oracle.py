@@ -3,6 +3,7 @@ import sys
 import eneel.utils as utils
 import decimal
 import os
+import re
 
 import logging
 
@@ -153,26 +154,58 @@ class Database:
             logger.error("Failed getting tables")
 
     def table_columns(self, schema, table):
+        query = "SELECT * FROM " + schema + "." + table
+        columns = self.query_columns(query)
+        return columns
+
+    def query_columns(self, query):
         try:
-            q = """
-                SELECT 
-                      COLUMN_ID AS ordinal_position,
-                      COLUMN_NAME AS column_name,
-                      DATA_TYPE AS data_type,
-                      DATA_LENGTH AS character_maximum_length,
-                      DATA_PRECISION AS numeric_precision,
-                      DATA_SCALE AS numeric_scale
-                FROM all_tab_cols
-                WHERE 
-                    owner = :s
-                    and table_name = :t
-                    AND COLUMN_ID IS NOT NULL
-                    order by COLUMN_ID
-                    """
-            columns = self.query(q, [schema, table])
+            query = "SELECT * FROM (" + query + ") q WHERE ROWNUM <= 1"
+            print(query)
+            self.execute(query)
+            data = self.fetchone()
+            cursor_columns = self.cursor.description
+            print(cursor_columns)
+            print(data)
+
+        except Exception as e:
+            print(e)
+            logger.error("Failed getting query columns")
+            return
+        try:
+            columns = []
+            for i in range(len(cursor_columns)):
+                ordinal_position = i
+                column_name = cursor_columns[i][0]
+                data_type = re.findall(r"'(.+?)'", str(type(data[i])))[0]
+                if data_type in ("cx_Oracle.LOB", "cx_Oracle.Object"):
+                    data_type = "bytes"
+                if data_type == "str":
+                    character_maximum_length = cursor_columns[i][3]
+                else:
+                    character_maximum_length = None
+                if data_type in ("decimal.Decimal", "decimal", "int"):
+                    numeric_precision = cursor_columns[i][4]
+                else:
+                    numeric_precision = None
+                if data_type in ("decimal.Decimal", "decimal", "int"):
+                    numeric_scale = cursor_columns[i][5]
+                else:
+                    numeric_scale = None
+                # data_type = python_type_to_db_type(data_type)
+
+                column = (
+                    ordinal_position + 1,
+                    column_name,
+                    data_type,
+                    character_maximum_length,
+                    numeric_precision,
+                    numeric_scale,
+                )
+                columns.append(column)
             return columns
         except:
-            logger.error("Failed getting columns")
+            logger.error("Failed generating db types from cursor description")
 
     def check_table_exist(self, table_name):
         try:
