@@ -3,17 +3,19 @@ import pytest
 import os
 
 from dotenv import find_dotenv, load_dotenv
+
 load_dotenv(find_dotenv())
 
 
 @pytest.fixture
 def db():
     db = Database(
-        os.getenv('POSTGRES_TEST_HOST'),
-        os.getenv('POSTGRES_TEST_USER'),
-        os.getenv('POSTGRES_TEST_PASS'),
-        os.getenv('POSTGRES_TEST_DBNAME'),
-        os.getenv('POSTGRES_TEST_PORT'))
+        os.getenv("POSTGRES_TEST_HOST"),
+        os.getenv("POSTGRES_TEST_USER"),
+        os.getenv("POSTGRES_TEST_PASS"),
+        os.getenv("POSTGRES_TEST_DBNAME"),
+        os.getenv("POSTGRES_TEST_PORT"),
+    )
 
     setup_sql = """
     drop schema if exists test cascade;
@@ -44,9 +46,8 @@ def db():
 
 
 class TestDatabasePg:
-
     def test_init(self, db):
-        assert db._dialect == 'postgres'
+        assert db._dialect == "postgres"
 
     def test_schemas(self, db):
         schemas = db.schemas()
@@ -61,86 +62,95 @@ class TestDatabasePg:
         assert len(tables) > 0
 
     def test_table_columns(self, db):
-        table_columns = db.table_columns('test', 'test1')
+        table_columns = db.table_columns("test", "test1")
 
         assert type(table_columns) == list
         assert len(table_columns) > 0
 
     def test_check_table_exist(self, db):
 
-        assert db.check_table_exist('test.test1') is True
-        assert db.check_table_exist('test.test_does_not_exist') is False
+        assert db.check_table_exist("test.test1") is True
+        assert db.check_table_exist("test.test_does_not_exist") is False
 
     def test_truncate_table(self, db):
-        db.truncate_table('test.test1')
+        db.truncate_table("test.test1")
         counts = db.query("select count(*) from test.test1")
 
         assert counts[0][0] == 0
 
     def test_create_schema(self, db):
-        db.execute('drop schema if exists test_create_schema')
-        db.create_schema('test_create_schema')
+        db.execute("drop schema if exists test_create_schema")
+        db.create_schema("test_create_schema")
 
-        assert 'test_create_schema' in db.schemas()
+        assert "test_create_schema" in db.schemas()
 
     def test_get_max_column_value(self, db):
 
-        assert db.get_max_column_value('test.test1', 'id_col') == '3'
+        assert db.get_max_column_value("test.test1", "id_col") == "3"
 
     def test_get_min_max_column_value(self, db):
-        min, max = db.get_min_max_column_value('test.test1', 'id_col')
+        min, max = db.get_min_max_column_value("test.test1", "id_col")
         assert min == 1
         assert max == 3
 
     def test_export_table(self, tmpdir, db):
-        columns = [(1, 'id_col', 'integer', None, 32, 0)]
+        columns = [(1, "id_col", "integer", None, 32, 0)]
         path = tmpdir
-        file_path, delimiter, row_count = db.export_table('test', 'test1', columns, path)
+        file_path, delimiter, row_count = db.export_table(
+            "test", "test1", columns, path
+        )
 
         assert row_count == 3
         assert os.path.exists(file_path) == 1
 
     def test_import_table(self, tmpdir, db):
-        columns = [(1, 'id_col', 'integer', None, 32, 0)]
+        columns = [(1, "id_col", "integer", None, 32, 0)]
         path = tmpdir
-        file_path, delimiter, row_count = db.export_table('test', 'test1', columns, path)
+        file_path, delimiter, row_count = db.export_table(
+            "test", "test1", columns, path
+        )
 
-        db.create_table_from_columns('test_target', 'test1_target', columns)
+        db.create_table_from_columns("test_target", "test1_target", columns)
 
-        return_code, row_count = db.import_table('test_target', 'test1_target', file_path)
+        return_code, row_count = db.import_table(
+            "test_target", "test1_target", file_path
+        )
 
-        assert return_code == 'RUN'
+        assert return_code == "RUN"
         assert row_count == 3
 
     def test_generate_create_table_ddl(self, db):
-        columns = [(1, 'id_col', 'integer', None, 32, 0)]
-        ddl = db.generate_create_table_ddl('test', 'test1', columns)
+        columns = [(1, "id_col", "integer", None, 32, 0)]
+        ddl = db.generate_create_table_ddl("test", "test1", columns)
 
-        assert ddl == """CREATE TABLE test.test1(
+        assert (
+            ddl
+            == """CREATE TABLE test.test1(
 id_col integer)"""
+        )
 
     def test_create_log_table(self, db):
-        db.execute('drop table if exists log_schema.log_table')
-        db.create_log_table('log_schema', 'log_table')
+        db.execute("drop table if exists log_schema.log_table")
+        db.create_log_table("log_schema", "log_table")
 
-        assert db.check_table_exist('log_schema.log_table')
+        assert db.check_table_exist("log_schema.log_table")
 
     def test_log(self, db):
-        db.execute('drop table if exists log_schema.log_table')
-        db.create_log_table('log_schema', 'log_table')
-        db.log('log_schema', 'log_table', project='project')
+        db.execute("drop table if exists log_schema.log_table")
+        db.create_log_table("log_schema", "log_table")
+        db.log("log_schema", "log_table", project="project")
 
-        assert db.query('select count(*) from log_schema.log_table')[0][0] == 1
+        assert db.query("select count(*) from log_schema.log_table")[0][0] == 1
 
     def test_query_columns(self, db):
-        query_columns = db.query_columns('select id_col, name_col, datetime_col from test.test1')
+        query_columns = db.query_columns(
+            "select id_col, name_col, datetime_col from test.test1"
+        )
 
         assert type(query_columns) == list
         assert len(query_columns) > 0
-        assert query_columns[0][1] == 'id_col'
-        assert query_columns[0][2] == 'int'
-        assert query_columns[1][2] == 'varchar'
+        assert query_columns[0][1] == "id_col"
+        assert query_columns[0][2] == "int"
+        assert query_columns[1][2] == "varchar"
         assert query_columns[1][3] == 64
-        assert query_columns[2][2] == 'timestamp'
-
-
+        assert query_columns[2][2] == "timestamp"
