@@ -94,13 +94,13 @@ def export_csv(rows, filename, delimiter="|"):
                     col = 1
                 if col is False:
                     col = 0
-
-                # col = (row[i] or '')
                 if i < len(row) - 1:
                     col = str(col).strip() + delimiter
                 else:
                     col = str(col).strip()
                 csv_row += col
+            # Replace linebreaks if any
+            #csv_row.replace('\n', '')
             csv_file.write(csv_row + "\n")
         csv_file.close()
         rowcount = len(rows)

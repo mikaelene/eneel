@@ -160,34 +160,33 @@ class Database:
     def query_columns(self, query):
         try:
             query = "SELECT * FROM (" + query + ") q WHERE ROWNUM <= 1"
-            self.execute(query)
-            data = self.fetchone()
-            cursor_columns = self.cursor.description
-
-        except Exception as e:
-            logger.error(e)
+            cursor_columns = self.execute(query).description
+        except:
             logger.error("Failed getting query columns")
             return
         try:
             columns = []
-            for i in range(len(cursor_columns)):
-                ordinal_position = i
-                column_name = cursor_columns[i][0]
-                data_type = re.findall(r"'(.+?)'", str(type(data[i])))[0]
-                if data_type in ("cx_Oracle.LOB", "cx_Oracle.Object"):
+            for column in cursor_columns:
+                ordinal_position = cursor_columns.index(column)
+                column_name = column[0]
+                data_type = re.findall(r"'(.+?)'", str(column[1]))[0]
+                character_maximum_length = None
+                numeric_precision = None
+                numeric_scale = None
+                if data_type in ("cx_Oracle.CLOB", "cx_Oracle.BLOB", "cx_Oracle.OBJECT", "cx_Oracle.BFILE", "cx_Oracle.NCLOB"):
                     data_type = "bytes"
-                if data_type == "str":
-                    character_maximum_length = cursor_columns[i][3]
-                else:
-                    character_maximum_length = None
-                if data_type in ("decimal.Decimal", "decimal", "int"):
-                    numeric_precision = cursor_columns[i][4]
-                else:
-                    numeric_precision = None
-                if data_type in ("decimal.Decimal", "decimal", "int"):
-                    numeric_scale = cursor_columns[i][5]
-                else:
-                    numeric_scale = None
+                elif data_type in ("cx_Oracle.DATETIME", "cx_Oracle.TIMESTAMP"):
+                    data_type = "datetime.datetime"
+                elif data_type == "cx_Oracle.STRING":
+                    data_type = "str"
+                    character_maximum_length = column[3]
+                elif data_type in ("cx_Oracle.NUMBER"):
+                    if column[4] <= 0:
+                        data_type = "int"
+                    else:
+                        data_type = "decimal.Decimal"
+                        numeric_precision = column[4]
+                        numeric_scale = column[5]
                 # data_type = python_type_to_db_type(data_type)
 
                 column = (
@@ -200,8 +199,27 @@ class Database:
                 )
                 columns.append(column)
             return columns
-        except:
+        except Exception as e:
+            logger.error(e)
             logger.error("Failed generating db types from cursor description")
+
+
+
+      #          if data_type in ("cx_Oracle.LOB", "cx_Oracle.Object"):
+      #              data_type = "bytes"
+      #          if data_type == "str":
+      #              character_maximum_length = cursor_columns[i][3]
+
+    def remove_unsupported_columns(self, columns):
+        columns_to_keep = columns.copy()
+        for column in columns:
+            data_type = column[2]
+            character_maximum_length = column[3]
+            if data_type == 'str' and character_maximum_length > 8000:
+                columns_to_keep.remove(column)
+            if data_type == 'bytearray':
+                columns_to_keep.remove(column)
+        return columns_to_keep
 
     def check_table_exist(self, table_name):
         try:

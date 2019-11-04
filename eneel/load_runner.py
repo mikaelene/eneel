@@ -860,20 +860,8 @@ def run_load(project_load):
             )
 
         # Columns to load
-        try:
-            columns = source.table_columns(source_schema, source_table)
-            if source_columntypes_to_exclude:
-                columns_to_load = columns.copy()
-                for col in columns:
-                    # data_type = col[2].lower()
-                    data_type = col[2]
-                    if data_type in source_columntypes_to_exclude:
-                        columns_to_load.remove(col)
-                columns = columns_to_load
-        except:
-            logger.error("Could not determine columns to load")
-            return return_code
-
+        columns = source.table_columns(source_schema, source_table)
+        columns = source.remove_unsupported_columns(columns)
         # Load type and settings
         replication_method = table.get("replication_method", "FULL_TABLE")
         parallelization_key = table.get("parallelization_key")

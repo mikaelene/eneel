@@ -320,6 +320,17 @@ class Database:
         except:
             logger.error("Failed generating db types from cursor description")
 
+    def remove_unsupported_columns(self, columns):
+        columns_to_keep = columns.copy()
+        for column in columns:
+            data_type = column[2]
+            character_maximum_length = column[3]
+            if data_type == 'str' and character_maximum_length > 8000:
+                columns_to_keep.remove(column)
+            if data_type == 'bytearray':
+                columns_to_keep.remove(column)
+        return columns_to_keep
+
     def check_table_exist(self, table_name):
         try:
             check_statement = """
@@ -543,7 +554,7 @@ class Database:
                 numeric_scale = col[5]
 
                 if data_type == "varchar":
-                    if character_maximum_length == -1:
+                    if character_maximum_length == -1 or character_maximum_length > 8000:
                         column = column_name + " varchar(MAX)"
                     else:
                         column = (
@@ -593,6 +604,7 @@ class Database:
 
             self.create_schema(schema)
             create_table_sql = self.generate_create_table_ddl(schema, table, columns)
+            logger.debug(create_table_sql)
             self.execute(create_table_sql)
             logger.debug("Table: " + schema_table + " created")
 
