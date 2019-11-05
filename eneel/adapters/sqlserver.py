@@ -118,7 +118,7 @@ def run_export_query(
 
 def python_type_to_db_type(python_type):
     if python_type == "str":
-        return "varchar"
+        return "nvarchar"
     elif python_type in ("bytes", "bytearray", "memoryview", "buffer"):
         return "binary"
     elif python_type == "bool":
@@ -130,7 +130,7 @@ def python_type_to_db_type(python_type):
     elif python_type == "datetime.datetime":
         return "datetime2"
     elif python_type in ("int", "long"):
-        return "int"
+        return "bigint"
     elif python_type == "float":
         return "float"
     elif python_type == "decimal.Decimal":
@@ -188,7 +188,7 @@ class Database:
             if codepage:
                 self._codepage = codepage
             else:
-                self._codepage = "1252"
+                self._codepage = "65001"
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
             self._table_where_clause = table_where_clause
@@ -325,8 +325,8 @@ class Database:
         for column in columns:
             data_type = column[2]
             character_maximum_length = column[3]
-            if data_type == 'str' and character_maximum_length > 8000:
-                columns_to_keep.remove(column)
+            #if data_type == 'str' and character_maximum_length > 8000:
+            #    columns_to_keep.remove(column)
             if data_type == 'bytearray':
                 columns_to_keep.remove(column)
         return columns_to_keep
@@ -553,13 +553,13 @@ class Database:
                 numeric_precision = col[4]
                 numeric_scale = col[5]
 
-                if data_type == "varchar":
-                    if character_maximum_length == -1 or character_maximum_length > 8000:
-                        column = column_name + " varchar(MAX)"
+                if data_type == "nvarchar":
+                    if character_maximum_length <= 0 or character_maximum_length > 4000:
+                        column = column_name + " nvarchar(MAX)"
                     else:
                         column = (
                             column_name
-                            + " varchar"
+                            + " nvarchar"
                             + "("
                             + str(character_maximum_length)
                             + ")"
