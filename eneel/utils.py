@@ -83,7 +83,7 @@ def run_cmd(cmd, envs=None):
 
 def export_csv(rows, filename, delimiter='|'):
     try:
-        csv_file = open(filename, 'a')
+        csv_file = open(filename, 'a', encoding="utf-8")
         for row in rows:
             csv_row = ''
             for i in range(len(row)):

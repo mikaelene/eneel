@@ -1,18 +1,17 @@
 # eneel
-eneel is a cli utility for extracting and loading data to and from relational databases. The E and L in ELT!
+eneel is a cli utility for fast extracting and loading data to and from relational databases. The E and L in ELT!
 
-It uses and requires the database vendors cli utilities. I.e for Oracle it uses and requires 
-[SQL*Plus](https://docs.oracle.com/cd/B19306_01/server.102/b14357/qstart.htm), 
-for SQL Server [bcp](https://docs.microsoft.com/en-us/sql/tools/bcp-utility?view=sql-server-2017), 
-for postgres it uses the postgres psql COPY command etc.
+The goal is to be the fastest tool in the market. Both in terms of development speed and data movements speed.
+
 
 Features:
 - Fastest way to extract and load large amounts of data between different databases
 - Automatic table creation and conversion of datatypes
+- Load a query from one database to another
 - Loads are executed in parallel 
 - Incremental loads
-- Omit "weird" datatypes on a project level. I.e omit all image datatypes in SQL Server or different blobs that selldom are used in a data warhouse environments
 - Pretty runtime logging of load progress
+- Database logging
 - Limit rows load in development
 - Configuration with yaml files. Just list the tables you want to replicate
 - Configuration files approach makes versioning with git etc easier
