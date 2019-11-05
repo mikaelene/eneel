@@ -554,7 +554,7 @@ class Database:
                 numeric_scale = col[5]
 
                 if data_type == "varchar":
-                    if character_maximum_length == -1 or character_maximum_length > 8000:
+                    if character_maximum_length <= 0 or character_maximum_length > 8000:
                         column = column_name + " varchar(MAX)"
                     else:
                         column = (
