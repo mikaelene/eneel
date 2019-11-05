@@ -279,7 +279,11 @@ def export_query(
         #                                        replication_key, max_replication_key)
         total_row_count = source.export_query(query, file_path, csv_delimiter)
 
-        return_code = "RUN"
+        if total_row_count:
+            return_code = "RUN"
+        else:
+            return_code = "ERROR"
+
     except:
         return_code = "ERROR"
         printer.print_load_line(
@@ -425,8 +429,11 @@ def strategy_full_table_load(
     target_table,
     parallelization_key,
 ):
-    export_row_count = None
-    import_row_count = None
+    # Set initial returns
+    return_code = "ERROR"
+    export_row_count = 0
+    import_row_count = 0
+
     # Full source table
     full_source_table = source_schema + "." + source_table
 
@@ -452,6 +459,7 @@ def strategy_full_table_load(
             )
         except Exception as e:
             logger.error(e)
+            return_code = "ERROR"
 
         if return_code == "ERROR":
             return return_code, export_row_count, import_row_count
@@ -470,6 +478,7 @@ def strategy_full_table_load(
             )
         except Exception as e:
             logger.error(e)
+            return_code = "ERROR"
 
         if return_code == "ERROR":
             return return_code, export_row_count, import_row_count
@@ -489,6 +498,7 @@ def strategy_full_table_load(
             )
         except Exception as e:
             logger.error(e)
+            return_code = "ERROR"
 
         if return_code == "ERROR":
             return return_code, export_row_count, import_row_count
@@ -507,6 +517,7 @@ def strategy_full_table_load(
             )
         except Exception as e:
             logger.error(e)
+            return_code = "ERROR"
 
         if return_code == "ERROR":
             return return_code, export_row_count, import_row_count
@@ -538,8 +549,10 @@ def strategy_full_query_load(
     target_table,
     parallelization_key=None,
 ):
-    export_row_count = None
-    import_row_count = None
+    # Set initial returns
+    return_code = "ERROR"
+    export_row_count = 0
+    import_row_count = 0
 
     try:
         # Temp table
@@ -560,6 +573,7 @@ def strategy_full_query_load(
             )
         except Exception as e:
             logger.error(e)
+            return_code = "ERROR"
 
         if return_code == "ERROR":
             return return_code, export_row_count, import_row_count
@@ -578,6 +592,7 @@ def strategy_full_query_load(
             )
         except Exception as e:
             logger.error(e)
+            return_code = "ERROR"
 
         if return_code == "ERROR":
             return return_code, export_row_count, import_row_count
@@ -596,6 +611,7 @@ def strategy_full_query_load(
             )
         except Exception as e:
             logger.error(e)
+            return_code = "ERROR"
 
         if return_code == "ERROR":
             return return_code, export_row_count, import_row_count
@@ -613,6 +629,7 @@ def strategy_full_query_load(
             )
         except Exception as e:
             logger.error(e)
+            return_code = "ERROR"
 
         if return_code == "ERROR":
             return return_code, export_row_count, import_row_count
@@ -643,8 +660,11 @@ def strategy_incremental(
     replication_key=None,
     parallelization_key=None,
 ):
-    export_row_count = None
-    import_row_count = None
+    # Set initial returns
+    return_code = "ERROR"
+    export_row_count = 0
+    import_row_count = 0
+
     full_source_table = source_schema + "." + source_table
 
     try:
@@ -657,21 +677,21 @@ def strategy_incremental(
             printer.print_load_line(
                 index,
                 total,
-                "ERROR",
+                return_code,
                 full_source_table,
                 msg="replication key not defined",
             )
-            return return_code
+            return return_code, export_row_count, import_row_count
 
         if replication_key not in [column[1] for column in columns]:
             printer.print_load_line(
                 index,
                 total,
-                "ERROR",
+                return_code,
                 full_source_table,
                 msg="replication key not found in table",
             )
-            return return_code
+            return return_code, export_row_count, import_row_count
 
         # Get max replication key in target
         if target.check_table_exist(full_target_table):
@@ -708,63 +728,83 @@ def strategy_incremental(
 
         else:
             # Export new rows
-            return_code, temp_path_load, delimiter, export_row_count = export_table(
-                return_code,
-                index,
-                total,
-                source,
-                source_schema,
-                source_table,
-                columns,
-                temp_path_load,
-                csv_delimiter,
-                replication_key=replication_key,
-                max_replication_key=max_replication_key,
-                parallelization_key=parallelization_key,
-            )
+            try:
+                return_code, temp_path_load, delimiter, export_row_count = export_table(
+                    return_code,
+                    index,
+                    total,
+                    source,
+                    source_schema,
+                    source_table,
+                    columns,
+                    temp_path_load,
+                    csv_delimiter,
+                    replication_key=replication_key,
+                    max_replication_key=max_replication_key,
+                    parallelization_key=parallelization_key,
+                )
+            except Exception as e:
+                logger.error(e)
+                return_code = "ERROR"
+
             if return_code == "ERROR":
                 return return_code, export_row_count, import_row_count
 
             # Create temp table
-            return_code = create_temp_table(
-                return_code,
-                index,
-                total,
-                target,
-                target_schema,
-                target_table_tmp,
-                columns,
-                full_source_table,
-            )
+            try:
+                return_code = create_temp_table(
+                    return_code,
+                    index,
+                    total,
+                    target,
+                    target_schema,
+                    target_table_tmp,
+                    columns,
+                    full_source_table,
+                )
+            except Exception as e:
+                logger.error(e)
+                return_code = "ERROR"
+
             if return_code == "ERROR":
                 return return_code, export_row_count, import_row_count
 
             # Import into temp table
-            return_code, import_row_count = import_into_temp_table(
-                return_code,
-                index,
-                total,
-                target,
-                target_schema,
-                target_table_tmp,
-                temp_path_load,
-                delimiter,
-                full_source_table,
-            )
+            try:
+                return_code, import_row_count = import_into_temp_table(
+                    return_code,
+                    index,
+                    total,
+                    target,
+                    target_schema,
+                    target_table_tmp,
+                    temp_path_load,
+                    delimiter,
+                    full_source_table,
+                )
+            except Exception as e:
+                logger.error(e)
+                return_code = "ERROR"
+
             if return_code == "ERROR":
                 return return_code, export_row_count, import_row_count
 
             # Insert into and drop
-            return_code = insert_from_table_and_drop_tmp(
-                return_code,
-                index,
-                total,
-                target,
-                target_schema,
-                target_table,
-                target_table_tmp,
-                full_source_table,
-            )
+            try:
+                return_code = insert_from_table_and_drop_tmp(
+                    return_code,
+                    index,
+                    total,
+                    target,
+                    target_schema,
+                    target_table,
+                    target_table_tmp,
+                    full_source_table,
+                )
+            except Exception as e:
+                logger.error(e)
+                return_code = "ERROR"
+
             if return_code == "ERROR":
                 return return_code, export_row_count, import_row_count
 
@@ -799,21 +839,16 @@ def run_load(project_load):
         logdb_table = project_load.get("logdb")["table"]
     else:
         logdb_conninfo = None
+        logdb_schema = None
+        logdb_table = None
 
-    # Set initial return code
+    # Set initial returns
     return_code = "ERROR"
+    export_row_count = 0
+    import_row_count = 0
 
     # Set load starttime
     load_start_time = time()
-
-    # Start logger. Seems to persist over load jobs when process are reused
-    import eneel.logger as logger
-
-    logger = logger.get_logger(project_name)
-
-    # Remove duplicated handler if any
-    for handler in logger.handlers[2:]:
-        logger.removeHandler(handler)
 
     # Connect to databases
     source = config.connection_from_config(source_conninfo)
@@ -852,16 +887,10 @@ def run_load(project_load):
         utils.delete_path(temp_path_load)
         utils.create_path(temp_path_load)
 
-        # Source column types to exclude
-        source_columntypes_to_exclude = project.get("source_columntypes_to_exclude")
-        if source_columntypes_to_exclude:
-            source_columntypes_to_exclude = (
-                source_columntypes_to_exclude.lower().replace(" ", "").split(",")
-            )
-
         # Columns to load
         columns = source.table_columns(source_schema, source_table)
         columns = source.remove_unsupported_columns(columns)
+
         # Load type and settings
         replication_method = table.get("replication_method", "FULL_TABLE")
         parallelization_key = table.get("parallelization_key")
