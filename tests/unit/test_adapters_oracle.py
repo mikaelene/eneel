@@ -85,25 +85,6 @@ class TestDatabaseOracle:
             == "Not implemented for this adapter"
         )
 
-    def test_export_table(self, tmpdir, db):
-        # columns = os.environ['ORACLE_TEST_TABLE_COLUMN'].split()
-        columns = [(1, "ID_COL", "NUMBER", None, 22, 0)]
-        path = tmpdir
-        file_path, delimiter, row_count = db.export_table(
-            os.getenv("ORACLE_TEST_SCHEMA"),
-            os.getenv("ORACLE_TEST_TABLE"),
-            columns,
-            path,
-            delimiter=",",
-            replication_key=None,
-            max_replication_key=None,
-            parallelization_key=None,
-        )
-
-        # assert row_count > 0
-        assert os.path.exists(file_path) == 1
-        assert os.stat(file_path).st_size > 0
-
     def test_import_table(self, tmpdir, db):
         assert (
             db.import_table("test_target", "test1_target", "path")
@@ -127,3 +108,16 @@ class TestDatabaseOracle:
             db.log("log_schema", "log_table", project="project")
             == "Not implemented for this adapter"
         )
+
+    def test_query_columns(self, db):
+        query_columns = db.query_columns(
+            "select id_col, name_col, datetime_col from test.test1"
+        )
+
+        assert type(query_columns) == list
+        assert len(query_columns) > 0
+        assert query_columns[0][1] == "ID_COL"
+        assert query_columns[0][2] == "int"
+        assert query_columns[1][2] == "str"
+        assert query_columns[1][3] == 64
+        assert query_columns[2][2] == "datetime.datetime"

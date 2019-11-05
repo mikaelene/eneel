@@ -175,7 +175,12 @@ class Database:
                 character_maximum_length = None
                 numeric_precision = None
                 numeric_scale = None
-                if data_type in ("cx_Oracle.BLOB", "cx_Oracle.OBJECT", "cx_Oracle.BFILE", "cx_Oracle.NCLOB"):
+                if data_type in (
+                    "cx_Oracle.BLOB",
+                    "cx_Oracle.OBJECT",
+                    "cx_Oracle.BFILE",
+                    "cx_Oracle.NCLOB",
+                ):
                     data_type = "bytes"
                 elif data_type in ("cx_Oracle.DATETIME", "cx_Oracle.TIMESTAMP"):
                     data_type = "datetime.datetime"
@@ -215,9 +220,9 @@ class Database:
         for column in columns:
             data_type = column[2]
             character_maximum_length = column[3]
-            if data_type == 'str' and character_maximum_length > 8000:
+            if data_type == "str" and character_maximum_length > 8000:
                 columns_to_keep.remove(column)
-            if data_type in ('bytearray'):
+            if data_type in ("bytearray"):
                 columns_to_keep.remove(column)
         return columns_to_keep
 
