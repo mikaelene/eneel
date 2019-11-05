@@ -6,7 +6,8 @@ import yaml
 import csv
 
 import logging
-logger = logging.getLogger('main_logger')
+
+logger = logging.getLogger("main_logger")
 
 
 def create_path(path_name):
@@ -44,10 +45,10 @@ def load_yaml(stream):
 
 def load_file_contents(path, strip=True):
     if not os.path.exists(path):
-        logger.error(path + ' not found')
+        logger.error(path + " not found")
 
-    with open(path, 'rb') as handle:
-        to_return = handle.read().decode('utf-8')
+    with open(path, "rb") as handle:
+        to_return = handle.read().decode("utf-8")
 
     if strip:
         to_return = to_return.strip()
@@ -61,12 +62,14 @@ def run_cmd(cmd, envs=None):
         if envs:
             for env in envs:
                 my_env[env[0]] = env[1]
-        res = subprocess.run(cmd,
-                             text=True,
-                             capture_output=True,
-                             check=True,
-                             env=my_env,
-                             encoding='ISO-8859-2')
+        res = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            check=True,
+            env=my_env,
+            encoding="ISO-8859-2",
+        )
         return res.returncode, res.stdout
     except subprocess.CalledProcessError as error:
         return error.returncode, error.stdout
@@ -80,7 +83,7 @@ def run_cmd(cmd, envs=None):
 
 def export_csv(rows, filename, delimiter='|'):
     try:
-        csv_file = open(filename, "a")
+        csv_file = open(filename, 'a')
         for row in rows:
             csv_row = ''
             for i in range(len(row)):
@@ -91,19 +94,19 @@ def export_csv(rows, filename, delimiter='|'):
                     col = 1
                 if col is False:
                     col = 0
-
-                #col = (row[i] or '')
-                if i < len(row)-1:
+                if i < len(row) - 1:
                     col = str(col).strip() + delimiter
                 else:
                     col = str(col).strip()
                 csv_row += col
+            # Replace linebreaks if any
+            csv_row = csv_row.replace('\n', ' ')
+            csv_row = csv_row.replace('\r', ' ')
             csv_file.write(csv_row + '\n')
         csv_file.close()
         rowcount = len(rows)
-        #logger.info(str(rowcount) + " rows added to " + filename)
+        # logger.info(str(rowcount) + " rows added to " + filename)
         return rowcount
     except Exception as e:
         logger.error(e)
         return 0
-

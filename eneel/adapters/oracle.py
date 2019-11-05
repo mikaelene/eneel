@@ -3,12 +3,16 @@ import sys
 import eneel.utils as utils
 import decimal
 import os
+import re
 
 import logging
-logger = logging.getLogger('main_logger')
+
+logger = logging.getLogger("main_logger")
 
 
-def run_export_query(server, user, password, database, port, query, file_path, delimiter, rows=5000):
+def run_export_query(
+    server, user, password, database, port, query, file_path, delimiter, rows=5000
+):
     try:
         db = Database(server, user, password, database, port)
         export = db.cursor.execute(query)
@@ -29,18 +33,29 @@ def run_export_query(server, user, password, database, port, query, file_path, d
         logger.error(e)
 
 
-def NumbersAsDecimal(cursor, name, defaultType, size, precision,
-        scale):
+def output_type_handler(cursor, name, defaultType, size, precision, scale):
     if defaultType == cx_Oracle.NUMBER:
-        return cursor.var(str, 100, cursor.arraysize,
-                outconverter = decimal.Decimal)
+        return cursor.var(str, 100, cursor.arraysize, outconverter=decimal.Decimal)
+    if defaultType == cx_Oracle.CLOB:
+        return cursor.var(cx_Oracle.LONG_STRING, arraysize=cursor.arraysize)
 
 
 class Database:
-    def __init__(self, server, user, password, database, port=None, limit_rows=None, table_where_clause=None,
-                 read_only=False, table_parallel_loads=10, table_parallel_batch_size=1000000):
+    def __init__(
+        self,
+        server,
+        user,
+        password,
+        database,
+        port=None,
+        limit_rows=None,
+        table_where_clause=None,
+        read_only=False,
+        table_parallel_loads=10,
+        table_parallel_batch_size=1000000,
+    ):
         try:
-            server_db = '{}:{}/{}'.format(server, port, database)
+            server_db = "{}:{}/{}".format(server, port, database)
             self._server = server
             self._user = user
             self._password = password
@@ -54,10 +69,10 @@ class Database:
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
 
-            os.environ['NLS_LANG'] = 'AMERICAN_AMERICA.WE8ISO8859P1'
+            os.environ["NLS_LANG"] = "AMERICAN_AMERICA.WE8ISO8859P1"
             self._conn = cx_Oracle.connect(user, password, server_db)
 
-            self._conn.outputtypehandler = NumbersAsDecimal
+            self._conn.outputtypehandler = output_type_handler
 
             self._cursor = self._conn.cursor()
             logger.debug("Connection to oracle successful")
@@ -112,7 +127,6 @@ class Database:
 
     def fetchmany(self, rows):
         try:
-            print('Entering fetchmany')
             return self.cursor.fetchmany(rows)
         except cx_Oracle.Error as e:
             logger.error(e)
@@ -126,7 +140,7 @@ class Database:
 
     def schemas(self):
         try:
-            q = 'SELECT DISTINCT OWNER FROM ALL_TABLES'
+            q = "SELECT DISTINCT OWNER FROM ALL_TABLES"
             schemas = self.query(q)
             return schemas
         except:
@@ -141,33 +155,82 @@ class Database:
             logger.error("Failed getting tables")
 
     def table_columns(self, schema, table):
+        query = "SELECT * FROM " + schema + "." + table
+        columns = self.query_columns(query)
+        return columns
+
+    def query_columns(self, query):
         try:
-            q = """
-                SELECT 
-                      COLUMN_ID AS ordinal_position,
-                      COLUMN_NAME AS column_name,
-                      DATA_TYPE AS data_type,
-                      DATA_LENGTH AS character_maximum_length,
-                      DATA_PRECISION AS numeric_precision,
-                      DATA_SCALE AS numeric_scale
-                FROM all_tab_cols
-                WHERE 
-                    owner = :s
-                    and table_name = :t
-                    AND COLUMN_ID IS NOT NULL
-                    order by COLUMN_ID
-                    """
-            columns = self.query(q, [schema, table])
-            return columns
+            query = "SELECT * FROM (" + query + ") q WHERE ROWNUM <= 1"
+            cursor_columns = self.execute(query).description
         except:
-            logger.error("Failed getting columns")
+            logger.error("Failed getting query columns")
+            return
+        try:
+            columns = []
+            for column in cursor_columns:
+                ordinal_position = cursor_columns.index(column)
+                column_name = column[0]
+                data_type = re.findall(r"'(.+?)'", str(column[1]))[0]
+                character_maximum_length = None
+                numeric_precision = None
+                numeric_scale = None
+                if data_type in ("cx_Oracle.BLOB", "cx_Oracle.OBJECT", "cx_Oracle.BFILE", "cx_Oracle.NCLOB"):
+                    data_type = "bytes"
+                elif data_type in ("cx_Oracle.DATETIME", "cx_Oracle.TIMESTAMP"):
+                    data_type = "datetime.datetime"
+                elif data_type == "cx_Oracle.STRING":
+                    data_type = "str"
+                    character_maximum_length = column[3]
+                elif data_type == "cx_Oracle.CLOB":
+                    data_type = "str"
+                    character_maximum_length = -1
+                elif data_type in ("cx_Oracle.NUMBER"):
+                    if column[5] == 0:
+                        data_type = "int"
+                    elif column[5] < 0:
+                        data_type = "float"
+                    else:
+                        data_type = "decimal.Decimal"
+                        numeric_precision = column[4]
+                        numeric_scale = column[5]
+                # data_type = python_type_to_db_type(data_type)
+
+                column = (
+                    ordinal_position + 1,
+                    column_name,
+                    data_type,
+                    character_maximum_length,
+                    numeric_precision,
+                    numeric_scale,
+                )
+                columns.append(column)
+            return columns
+        except Exception as e:
+            logger.error(e)
+            logger.error("Failed generating db types from cursor description")
+
+    def remove_unsupported_columns(self, columns):
+        columns_to_keep = columns.copy()
+        for column in columns:
+            data_type = column[2]
+            character_maximum_length = column[3]
+            if data_type == 'str' and character_maximum_length > 8000:
+                columns_to_keep.remove(column)
+            if data_type in ('bytearray'):
+                columns_to_keep.remove(column)
+        return columns_to_keep
 
     def check_table_exist(self, table_name):
         try:
-            check_statement = """
+            check_statement = (
+                """
             SELECT 1
            FROM   ALL_TABLES 
-           WHERE  OWNER || '.' || TABLE_NAME = '""" + table_name + "'"
+           WHERE  OWNER || '.' || TABLE_NAME = '"""
+                + table_name
+                + "'"
+            )
             exists = self.query(check_statement)
             if exists:
                 return True
@@ -177,13 +240,13 @@ class Database:
             logger.error("Failed checking table exist")
 
     def truncate_table(self, table_name):
-        return 'Not implemented for this adapter'
+        return "Not implemented for this adapter"
 
     def create_schema(self, schema):
-        return 'Not implemented for this adapter'
+        return "Not implemented for this adapter"
 
     def get_max_column_value(self, table_name, column):
-        return 'Not implemented for this adapter'
+        return "Not implemented for this adapter"
 
     def get_min_max_column_value(self, table_name, column):
         try:
@@ -199,7 +262,13 @@ class Database:
         try:
             sql = "SELECT MIN(" + column + "), MAX(" + column
             sql += "), ceil((max( " + column + ") - min("
-            sql += column + ")) / (count(*)/" + str(self._table_parallel_batch_size) + ".0)) FROM " + table_name
+            sql += (
+                column
+                + ")) / (count(*)/"
+                + str(self._table_parallel_batch_size)
+                + ".0)) FROM "
+                + table_name
+            )
             res = self.query(sql)
             min_value = int(res[0][0])
             max_value = int(res[0][1])
@@ -208,8 +277,15 @@ class Database:
         except:
             logger.debug("Failed getting min, max and batch column value")
 
-    def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
-                              parallelization_where=None):
+    def generate_export_query(
+        self,
+        columns,
+        schema,
+        table,
+        replication_key=None,
+        max_replication_key=None,
+        parallelization_where=None,
+    ):
         # Generate SQL statement for extract
         select_stmt = "SELECT "
         # Add columns
@@ -218,11 +294,13 @@ class Database:
             select_stmt += column_name + ", "
         select_stmt = select_stmt[:-2]
 
-        select_stmt += ' FROM ' + schema + "." + table
+        select_stmt += " FROM " + schema + "." + table
 
         # Where-claues for incremental replication
         if replication_key:
-            replication_where = replication_key + " > " + "'" + max_replication_key + "'"
+            replication_where = (
+                replication_key + " > " + "'" + max_replication_key + "'"
+            )
         else:
             replication_where = None
 
@@ -239,36 +317,49 @@ class Database:
         return select_stmt
 
     def export_query(self, query, file_path, delimiter, rows=5000):
-        rowcounts = run_export_query(self._server, self._user, self._password, self._database, self._port, query, file_path,
-                         delimiter, rows=5000)
+        rowcounts = run_export_query(
+            self._server,
+            self._user,
+            self._password,
+            self._database,
+            self._port,
+            query,
+            file_path,
+            delimiter,
+            rows=5000,
+        )
         return rowcounts
 
     def insert_from_table_and_drop(self, schema, to_table, from_table):
-        return 'Not implemented for this adapter'
+        return "Not implemented for this adapter"
 
     def switch_tables(self, schema, old_table, new_table):
-        return 'Not implemented for this adapter'
+        return "Not implemented for this adapter"
 
-    def import_table(self, schema, table, file, delimiter=','):
-        return 'Not implemented for this adapter'
+    def import_table(self, schema, table, file, delimiter=","):
+        return "Not implemented for this adapter"
 
     def generate_create_table_ddl(self, schema, table, columns):
-        return 'Not implemented for this adapter'
+        return "Not implemented for this adapter"
 
     def create_table_from_columns(self, schema, table, columns):
-        return 'Not implemented for this adapter'
+        return "Not implemented for this adapter"
 
     def create_log_table(self, schema, table):
-        return 'Not implemented for this adapter'
+        return "Not implemented for this adapter"
 
-    def log(self, schema, table,
-            project=None,
-            project_started_at=None,
-            source_table=None,
-            target_table=None,
-            started_at=None,
-            ended_at=None,
-            status=None,
-            exported_rows=None,
-            imported_rows=None):
-        return 'Not implemented for this adapter'
+    def log(
+        self,
+        schema,
+        table,
+        project=None,
+        project_started_at=None,
+        source_table=None,
+        target_table=None,
+        started_at=None,
+        ended_at=None,
+        status=None,
+        exported_rows=None,
+        imported_rows=None,
+    ):
+        return "Not implemented for this adapter"

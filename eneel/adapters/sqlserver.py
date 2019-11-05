@@ -6,45 +6,62 @@ import eneel.utils as utils
 import re
 
 import logging
-logger = logging.getLogger('main_logger')
+
+logger = logging.getLogger("main_logger")
 
 
-def run_import_file(server, database, user, password, trusted_connection, codepage, schema, table, file_path,
-                delimiter):
+def run_import_file(
+    server,
+    database,
+    user,
+    password,
+    trusted_connection,
+    codepage,
+    schema,
+    table,
+    file_path,
+    delimiter,
+):
 
     try:
         # Import data
-        bcp_in = ['bcp']
-        bcp_in.append('[' + database + '].[' + schema + '].[' + table + ']')
-        bcp_in.append('in')
+        bcp_in = ["bcp"]
+        bcp_in.append("[" + database + "].[" + schema + "].[" + table + "]")
+        bcp_in.append("in")
         bcp_in.append(file_path)
-        bcp_in.append('-t' + delimiter)
-        bcp_in.append('-c')
-        bcp_in.append('-C' + codepage)
-        bcp_in.append('-b100000')
-        bcp_in.append('-S' + server)
+        bcp_in.append("-t" + delimiter)
+        bcp_in.append("-c")
+        bcp_in.append("-C" + codepage)
+        bcp_in.append("-b100000")
+        bcp_in.append("-S" + server)
         if trusted_connection:
-            bcp_in.append('-T')
+            bcp_in.append("-T")
         else:
-            bcp_in.append('-U' + user)
-            bcp_in.append('-P' + password)
+            bcp_in.append("-U" + user)
+            bcp_in.append("-P" + password)
 
         logger.debug(bcp_in)
         cmd_code, cmd_message = utils.run_cmd(bcp_in)
-        return_code = 'ERROR'
+        return_code = "ERROR"
         row_count = 0
 
         if cmd_code == 0:
             try:
-                errors = cmd_message.count('Error')
+                errors = cmd_message.count("Error")
                 if errors > 0:
-                    logger.error('Importing in ' + schema + "." + table + ' completed with errors')
+                    logger.error(
+                        "Importing in "
+                        + schema
+                        + "."
+                        + table
+                        + " completed with errors"
+                    )
                 return_message = cmd_message.splitlines()
                 try:
                     row_count = int(return_message[-3].split()[0])
-                    return_code = 'RUN'
+                    return_code = "RUN"
                 except:
-                    if return_message[2].split()[0] == 'SQLState':
+                    if return_message[2].split()[0] == "SQLState":
                         logger.debug(cmd_message)
                         return_code = "WARN"
             except:
@@ -57,11 +74,30 @@ def run_import_file(server, database, user, password, trusted_connection, codepa
     return return_code, row_count
 
 
-def run_export_query(driver, server, database, port, user, password, trusted_connection, query,  file_path, delimiter,
-                     rows=5000):
+def run_export_query(
+    driver,
+    server,
+    database,
+    port,
+    user,
+    password,
+    trusted_connection,
+    query,
+    file_path,
+    delimiter,
+    rows=5000,
+):
     try:
-        db = Database(driver, server, database, port, limit_rows=None, user=user, password=password,
-                      trusted_connection=trusted_connection)
+        db = Database(
+            driver,
+            server,
+            database,
+            port,
+            limit_rows=None,
+            user=user,
+            password=password,
+            trusted_connection=trusted_connection,
+        )
         export = db.cursor.execute(query)
         rowcounts = 0
         while True:
@@ -81,37 +117,59 @@ def run_export_query(driver, server, database, port, user, password, trusted_con
 
 
 def python_type_to_db_type(python_type):
-    if python_type == 'str':
-        return 'varchar'
-    elif python_type in ('bytes', 'bytearray'):
-        return 'binary'
-    elif python_type == 'bool':
-        return 'bit'
-    elif python_type == 'datetime.date':
-        return 'date'
-    elif python_type == 'datetime.time':
-        return 'time'
-    elif python_type == 'datetime.datetime':
-        return 'datetime2'
-    elif python_type == 'int':
-        return 'int'
-    elif python_type == 'float':
-        return 'float'
-    elif python_type == 'decimal.Decimal':
-        return 'numeric'
-    elif python_type == 'UUID.uuid':
-        return 'UNIQUEIDENTIFIER'
+    if python_type == "str":
+        return "varchar"
+    elif python_type in ("bytes", "bytearray", "memoryview", "buffer"):
+        return "binary"
+    elif python_type == "bool":
+        return "bit"
+    elif python_type == "datetime.date":
+        return "date"
+    elif python_type in ("datetime.time", "timedelta"):
+        return "time"
+    elif python_type == "datetime.datetime":
+        return "datetime2"
+    elif python_type in ("int", "long"):
+        return "int"
+    elif python_type == "float":
+        return "float"
+    elif python_type == "decimal.Decimal":
+        return "numeric"
+    elif python_type == "UUID.uuid":
+        return "UNIQUEIDENTIFIER"
     else:
         return python_type
 
 
 class Database:
-    def __init__(self, driver, server, database, port=1433, limit_rows=None, user=None, password=None,
-                 trusted_connection=None, as_columnstore=False, read_only=False, codepage=None,
-                 table_parallel_loads=10, table_parallel_batch_size=10000000, table_where_clause=None):
+    def __init__(
+        self,
+        driver,
+        server,
+        database,
+        port=1433,
+        limit_rows=None,
+        user=None,
+        password=None,
+        trusted_connection=None,
+        as_columnstore=False,
+        read_only=False,
+        codepage=None,
+        table_parallel_loads=10,
+        table_parallel_batch_size=10000000,
+        table_where_clause=None,
+    ):
         try:
-            conn_string = "DRIVER={" + driver + "};SERVER=" + server + ";DATABASE=" + \
-                          database + ";PORT=" + str(port)
+            conn_string = (
+                "DRIVER={"
+                + driver
+                + "};SERVER="
+                + server
+                + ";DATABASE="
+                + database
+                + ";PORT="
+                + str(port)
+            )
             if trusted_connection:
                 conn_string += ";trusted_connection=yes"
             else:
@@ -130,7 +188,7 @@ class Database:
             if codepage:
                 self._codepage = codepage
             else:
-                self._codepage = '1252'
+                self._codepage = "1252"
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
             self._table_where_clause = table_where_clause
@@ -203,7 +261,7 @@ class Database:
 
     def schemas(self):
         try:
-            q = 'SELECT schema_name FROM information_schema.schemata'
+            q = "SELECT schema_name FROM information_schema.schemata"
             schemas = self.query(q)
             return [row[0] for row in schemas]
         except:
@@ -218,63 +276,60 @@ class Database:
             logger.error("Failed getting tables")
 
     def table_columns(self, schema, table):
-        try:
-            q = """
-                SELECT  
-                      ordinal_position,
-                      column_name,
-                      data_type,
-                      character_maximum_length,
-                      numeric_precision,
-                      numeric_scale
-                FROM information_schema.columns
-                WHERE 
-                    --table_schema + '.' + table_name = ?
-                    table_schema = ?
-                    and table_name = ?
-                    order by ordinal_position
-            """
-            columns = self.query(q, [schema, table])
-            return columns
-        except:
-            logger.error("Failed getting columns")
+        query = "SELECT * FROM " + schema + "." + table
+        columns = self.query_columns(query)
+        return columns
 
     def query_columns(self, query):
         try:
-            query = 'SELECT TOP 1 * FROM (' + query + ') q'
+            query = "SELECT TOP 1 * FROM (" + query + ") q"
             cursor_columns = self.execute(query).description
         except:
             logger.error("Failed getting query columns")
+            return
         try:
             columns = []
             for column in cursor_columns:
                 ordinal_position = cursor_columns.index(column)
                 column_name = column[0]
                 data_type = re.findall(r"'(.+?)'", str(column[1]))[0]
-                if data_type == 'str':
+                if data_type == "str":
                     character_maximum_length = column[3]
                 else:
                     character_maximum_length = None
-                if data_type in ('decimal', 'int'):
+                if data_type in ("decimal.Decimal", "decimal", "int"):
                     numeric_precision = column[4]
                 else:
                     numeric_precision = None
-                if data_type in ('decimal', 'int'):
+                if data_type in ("decimal.Decimal", "decimal", "int"):
                     numeric_scale = column[5]
                 else:
                     numeric_scale = None
-                data_type = python_type_to_db_type(data_type)
+                # data_type = python_type_to_db_type(data_type)
 
-                column = (ordinal_position + 1,
-                          column_name,
-                          data_type,
-                          character_maximum_length,
-                          numeric_precision,
-                          numeric_scale)
+                column = (
+                    ordinal_position + 1,
+                    column_name,
+                    data_type,
+                    character_maximum_length,
+                    numeric_precision,
+                    numeric_scale,
+                )
                 columns.append(column)
             return columns
         except:
             logger.error("Failed generating db types from cursor description")
+
+    def remove_unsupported_columns(self, columns):
+        columns_to_keep = columns.copy()
+        for column in columns:
+            data_type = column[2]
+            character_maximum_length = column[3]
+            if data_type == 'str' and character_maximum_length > 8000:
+                columns_to_keep.remove(column)
+            if data_type == 'bytearray':
+                columns_to_keep.remove(column)
+        return columns_to_keep
 
     def check_table_exist(self, table_name):
         try:
@@ -308,7 +363,7 @@ class Database:
             if schema in self.schemas():
                 pass
             else:
-                create_statement = 'CREATE SCHEMA ' + schema
+                create_statement = "CREATE SCHEMA " + schema
                 self.execute(create_statement)
                 logger.debug("Schema" + schema + " created")
         except:
@@ -337,7 +392,13 @@ class Database:
         try:
             sql = "SELECT MIN(" + column + "), MAX(" + column
             sql += "), CEILING((max( " + column + ") - min("
-            sql += column + ")) / (count(*)/" + str(self._table_parallel_batch_size) + ".0)) FROM " + table_name
+            sql += (
+                column
+                + ")) / (count(*)/"
+                + str(self._table_parallel_batch_size)
+                + ".0)) FROM "
+                + table_name
+            )
             res = self.query(sql)
             min_value = int(res[0][0])
             max_value = int(res[0][1])
@@ -346,14 +407,21 @@ class Database:
         except:
             logger.debug("Failed getting min, max and batch column value")
 
-    def generate_export_query(self, columns, schema, table, replication_key=None, max_replication_key=None,
-                              parallelization_where=None):
+    def generate_export_query(
+        self,
+        columns,
+        schema,
+        table,
+        replication_key=None,
+        max_replication_key=None,
+        parallelization_where=None,
+    ):
         # Generate SQL statement for extract
-        select_stmt = 'SELECT '
+        select_stmt = "SELECT "
 
         # Add limit
         if self._limit_rows:
-            select_stmt += 'TOP ' + str(self._limit_rows) + ' '
+            select_stmt += "TOP " + str(self._limit_rows) + " "
 
         # Add columns
         for col in columns:
@@ -361,11 +429,22 @@ class Database:
             select_stmt += column_name + ", "
         select_stmt = select_stmt[:-2]
 
-        select_stmt += ' FROM [' + self._database + '].[' + schema + '].[' + table + ']' + ' WITH (NOLOCK)'
+        select_stmt += (
+            " FROM ["
+            + self._database
+            + "].["
+            + schema
+            + "].["
+            + table
+            + "]"
+            + " WITH (NOLOCK)"
+        )
 
         # Where-claues for incremental replication
         if replication_key:
-            replication_where = replication_key + " > " + "'" + max_replication_key + "'"
+            replication_where = (
+                replication_key + " > " + "'" + max_replication_key + "'"
+            )
         else:
             replication_where = None
 
@@ -378,8 +457,19 @@ class Database:
         return select_stmt
 
     def export_query(self, query, file_path, delimiter, rows=5000):
-        rowcounts = run_export_query(self._driver, self._server, self._database, self._port, self._user, self._password,
-                                     self._trusted_connection, query, file_path, delimiter, rows)
+        rowcounts = run_export_query(
+            self._driver,
+            self._server,
+            self._database,
+            self._port,
+            self._user,
+            self._password,
+            self._trusted_connection,
+            query,
+            file_path,
+            delimiter,
+            rows,
+        )
         return rowcounts
 
     def insert_from_table_and_drop(self, schema, to_table, from_table):
@@ -388,12 +478,17 @@ class Database:
         to_schema_table = schema + "." + to_table
         from_schema_table = schema + "." + from_table
         try:
-            self.execute("INSERT INTO " + to_schema_table + " SELECT * FROM  " + from_schema_table)
+            self.execute(
+                "INSERT INTO "
+                + to_schema_table
+                + " SELECT * FROM  "
+                + from_schema_table
+            )
             self.execute("DROP TABLE " + from_schema_table)
-            return_code = 'RUN'
+            return_code = "RUN"
         except:
             logger.error("Failed to insert_from_table_and_drop")
-            return_code = 'ERROR'
+            return_code = "ERROR"
         finally:
             return return_code
 
@@ -408,26 +503,41 @@ class Database:
             delete_schema_table = schema + "." + delete_table
 
             if self.check_table_exist(old_schema_table):
-                self.execute("EXEC sp_rename '" + old_schema_table + "', '" + delete_table + "'")
-                self.execute("EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'")
+                self.execute(
+                    "EXEC sp_rename '" + old_schema_table + "', '" + delete_table + "'"
+                )
+                self.execute(
+                    "EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'"
+                )
                 self.execute("DROP TABLE " + delete_schema_table)
                 logger.debug("Switched tables")
             else:
-                self.execute("EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'")
+                self.execute(
+                    "EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'"
+                )
                 logger.debug("Renamed temp table")
-            return_code = 'RUN'
+            return_code = "RUN"
         except:
             logger.error("Failed to switch tables")
-            return_code = 'ERROR'
+            return_code = "ERROR"
         finally:
             return return_code
 
-    def import_file(self, schema, table, path, delimiter=','):
+    def import_file(self, schema, table, path, delimiter=","):
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
-        return_code, row_count = run_import_file(self._server, self._database, self._user, self._password,
-                                                 self._trusted_connection, self._codepage, schema, table, path,
-                                                 delimiter)
+        return_code, row_count = run_import_file(
+            self._server,
+            self._database,
+            self._user,
+            self._password,
+            self._trusted_connection,
+            self._codepage,
+            schema,
+            table,
+            path,
+            delimiter,
+        )
         return row_count
 
     def generate_create_table_ddl(self, schema, table, columns):
@@ -437,46 +547,42 @@ class Database:
 
                 ordinal_position = col[0]
                 column_name = "[" + col[1] + "]"
-                data_type = col[2].lower()
+                data_type = col[2]
+                data_type = python_type_to_db_type(data_type)
                 character_maximum_length = col[3]
                 numeric_precision = col[4]
                 numeric_scale = col[5]
 
-                if "char" in data_type:
-                    db_data_type = "VARCHAR" + "("
-                    if character_maximum_length == -1:
-                        db_data_type += "max"
+                if data_type == "varchar":
+                    if character_maximum_length == -1 or character_maximum_length > 8000:
+                        column = column_name + " varchar(MAX)"
                     else:
-                        db_data_type += str(character_maximum_length)
-                    db_data_type += ")"
-                elif "numeric" in data_type or "number" in data_type or "decimal" in data_type:
-                    if numeric_scale:
-                        db_data_type = "NUMERIC" + "(" + str(numeric_precision) + "," + str(numeric_scale) + ")"
-                    elif numeric_precision:
-                        db_data_type = "NUMERIC" + "(" + str(numeric_precision) + ")"
-                    else:
-                        db_data_type = "FLOAT"
-                elif "time zone" in data_type:
-                    db_data_type = "DATETIME2"
-                elif "timestamp" in data_type:
-                    db_data_type = "DATETIME2"
-                elif "bool" in data_type:
-                    db_data_type = "INT"
-                elif "clob" in data_type:
-                    db_data_type = "VARCHAR(MAX)"
+                        column = (
+                            column_name
+                            + " varchar"
+                            + "("
+                            + str(character_maximum_length)
+                            + ")"
+                        )
+                elif data_type == "numeric":
+                    column = (
+                        column_name
+                        + " numeric("
+                        + str(numeric_precision)
+                        + ","
+                        + str(numeric_scale)
+                        + ")"
+                    )
                 else:
-                    db_data_type = data_type
+                    column = column_name + " " + data_type
 
-                column = column_name + " " + db_data_type
                 create_table_sql += column + ", \n"
-
             create_table_sql = create_table_sql[:-3]
             create_table_sql += ")"
 
-            logger.debug(create_table_sql)
-
             return create_table_sql
-        except:
+        except Exception as e:
+            logger.error(e)
             logger.error("Failed generating create table script")
 
     def create_table_from_columns(self, schema, table, columns):
@@ -484,9 +590,12 @@ class Database:
             sys.exit("This source is readonly. Terminating load run")
         try:
             schema_table = schema + "." + table
-            self.execute("SELECT * FROM INFORMATION_SCHEMA.TABLES "
-                                        "WHERE TABLE_SCHEMA = ? AND "
-                                        "TABLE_NAME = ?", [schema, table])
+            self.execute(
+                "SELECT * FROM INFORMATION_SCHEMA.TABLES "
+                "WHERE TABLE_SCHEMA = ? AND "
+                "TABLE_NAME = ?",
+                [schema, table],
+            )
             table_exists = self.fetchone()
 
             if table_exists:
@@ -495,6 +604,7 @@ class Database:
 
             self.create_schema(schema)
             create_table_sql = self.generate_create_table_ddl(schema, table, columns)
+            logger.debug(create_table_sql)
             self.execute(create_table_sql)
             logger.debug("Table: " + schema_table + " created")
 
@@ -502,8 +612,15 @@ class Database:
             if self._as_columnstore:
                 try:
                     index_name = schema + "_" + table + "_cci"
-                    self.execute("DROP INDEX IF EXISTS " + index_name + " ON " + schema_table)
-                    self.execute("CREATE CLUSTERED COLUMNSTORE INDEX " + index_name + " ON " + schema_table)
+                    self.execute(
+                        "DROP INDEX IF EXISTS " + index_name + " ON " + schema_table
+                    )
+                    self.execute(
+                        "CREATE CLUSTERED COLUMNSTORE INDEX "
+                        + index_name
+                        + " ON "
+                        + schema_table
+                    )
                     logger.debug("Index: " + index_name + " created")
                 except:
                     logger.error("Failed create columnstoreindex")
@@ -514,11 +631,11 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
 
-        full_table = schema + '.' + table
+        full_table = schema + "." + table
 
         if not self.check_table_exist(full_table):
-            logger.debug('Log table exist')
-            ddl = 'create table '
+            logger.debug("Log table exist")
+            ddl = "create table "
             ddl += full_table
             ddl += """(
             log_time    datetime2(6),
@@ -535,10 +652,10 @@ class Database:
 
             self.create_schema(schema)
             self.execute(ddl)
-            logger.debug(full_table + ' created')
+            logger.debug(full_table + " created")
 
-        view1_ddl = 'create or alter view '
-        view1_ddl += full_table + '_summary as '
+        view1_ddl = "create or alter view "
+        view1_ddl += full_table + "_summary as "
         view1_ddl += """select
 CONVERT(varchar(10),project_started_at,120) as project_started_date, 
 project_started_at, 
@@ -559,8 +676,8 @@ project_started_at,
 project"""
         self.execute(view1_ddl)
 
-        view2_ddl = 'create or alter view '
-        view2_ddl += full_table + '_details as '
+        view2_ddl = "create or alter view "
+        view2_ddl += full_table + "_details as "
         view2_ddl += """select
 CONVERT(varchar(10),project_started_at,120) as project_started_date, 
 project_started_at, 
@@ -576,26 +693,41 @@ imported_rows as imported_rows,
 imported_rows / datediff(second , started_at, ended_at) as loaded_rows_per_sec
 from  """
         view2_ddl += full_table
-        view2_ddl += ' where source_table is not null'
+        view2_ddl += " where source_table is not null"
         self.execute(view2_ddl)
 
-    def log(self, schema, table,
-            project=None,
-            project_started_at=None,
-            source_table=None,
-            target_table=None,
-            started_at=None,
-            ended_at=None,
-            status=None,
-            exported_rows=None,
-            imported_rows=None):
+    def log(
+        self,
+        schema,
+        table,
+        project=None,
+        project_started_at=None,
+        source_table=None,
+        target_table=None,
+        started_at=None,
+        ended_at=None,
+        status=None,
+        exported_rows=None,
+        imported_rows=None,
+    ):
 
-        full_table = schema + '.' + table
+        full_table = schema + "." + table
         log_time = datetime.fromtimestamp(time())
-        row = [log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows]
+        row = [
+            log_time,
+            project,
+            project_started_at,
+            source_table,
+            target_table,
+            started_at,
+            ended_at,
+            status,
+            exported_rows,
+            imported_rows,
+        ]
 
-        sql = 'INSERT INTO ' + full_table
-        sql += ' (log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows)'
-        sql += ' VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        sql = "INSERT INTO " + full_table
+        sql += " (log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows)"
+        sql += " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
         self.execute(sql, row)

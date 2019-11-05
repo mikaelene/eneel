@@ -4,7 +4,9 @@ import datetime
 import pytest
 
 from dotenv import find_dotenv, load_dotenv
+
 load_dotenv(find_dotenv())
+
 
 @pytest.fixture
 def run_project_fixture(tmp_path):
@@ -28,7 +30,7 @@ schemas:
     tables:                             # List Tables to replicate
       - table_name: "test1"
       """
-    project_yml_path = tmp_path / 'test_project.yml'
+    project_yml_path = tmp_path / "test_project.yml"
     project_yml_path.write_text(project_yml)
 
     connections_yml = """db:
@@ -36,22 +38,23 @@ schemas:
   outputs:
     dev:
 """
-    connections_yml += '      host: ' + os.getenv('POSTGRES_TEST_HOST') + '\n'
-    connections_yml += '      port: ' + os.getenv('POSTGRES_TEST_PORT') + '\n'
-    connections_yml += '      user: ' + os.getenv('POSTGRES_TEST_USER') + '\n'
-    connections_yml += '      password: ' + os.getenv('POSTGRES_TEST_PASS') + '\n'
-    connections_yml += '      database: ' + os.getenv('POSTGRES_TEST_DBNAME') + '\n'
-    connections_yml += '  target: dev'
+    connections_yml += "      host: " + os.getenv("POSTGRES_TEST_HOST") + "\n"
+    connections_yml += "      port: " + os.getenv("POSTGRES_TEST_PORT") + "\n"
+    connections_yml += "      user: " + os.getenv("POSTGRES_TEST_USER") + "\n"
+    connections_yml += "      password: " + os.getenv("POSTGRES_TEST_PASS") + "\n"
+    connections_yml += "      database: " + os.getenv("POSTGRES_TEST_DBNAME") + "\n"
+    connections_yml += "  target: dev"
 
-    connections_yml_path = tmp_path / 'connections.yml'
+    connections_yml_path = tmp_path / "connections.yml"
     connections_yml_path.write_text(connections_yml)
 
     db = Database(
-        os.getenv('POSTGRES_TEST_HOST'),
-        os.getenv('POSTGRES_TEST_USER'),
-        os.getenv('POSTGRES_TEST_PASS'),
-        os.getenv('POSTGRES_TEST_DBNAME'),
-        os.getenv('POSTGRES_TEST_PORT'))
+        os.getenv("POSTGRES_TEST_HOST"),
+        os.getenv("POSTGRES_TEST_USER"),
+        os.getenv("POSTGRES_TEST_PASS"),
+        os.getenv("POSTGRES_TEST_DBNAME"),
+        os.getenv("POSTGRES_TEST_PORT"),
+    )
 
     setup_sql = """
     drop schema if exists run_project cascade;
@@ -71,7 +74,7 @@ schemas:
 
     db.execute(setup_sql)
 
-    db.create_log_table('test_logging', 'run_log')
+    db.create_log_table("test_logging", "run_log")
 
     current_run_dir = os.getcwd()
     run_dir = os.fspath(tmp_path)
@@ -92,11 +95,12 @@ schemas:
 @pytest.fixture
 def project_load(tmp_path):
     db = Database(
-        os.getenv('POSTGRES_TEST_HOST'),
-        os.getenv('POSTGRES_TEST_USER'),
-        os.getenv('POSTGRES_TEST_PASS'),
-        os.getenv('POSTGRES_TEST_DBNAME'),
-        os.getenv('POSTGRES_TEST_PORT'))
+        os.getenv("POSTGRES_TEST_HOST"),
+        os.getenv("POSTGRES_TEST_USER"),
+        os.getenv("POSTGRES_TEST_PASS"),
+        os.getenv("POSTGRES_TEST_DBNAME"),
+        os.getenv("POSTGRES_TEST_PORT"),
+    )
 
     setup_sql = """
     drop schema if exists test_run_load cascade;
@@ -116,9 +120,83 @@ def project_load(tmp_path):
 
     db.execute(setup_sql)
 
-    db.create_log_table('test_logging', 'run_log')
+    db.create_log_table("test_logging", "run_log")
 
-    project_load = {'load_order': 1, 'num_tables_to_load': 2, 'project_name': 'test_project', 'source_conninfo': {'name': 'source', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME'), 'table_parallel_loads': 10, 'table_parallel_batch_size': 500}}, 'target_conninfo': {'name': 'target', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME')}}, 'logdb': {'conninfo': {'name': 'logging', 'type': 'postgres', 'read_only': None, 'target': 'dev', 'credentials': {'host': os.getenv('POSTGRES_TEST_HOST'), 'port': os.getenv('POSTGRES_TEST_PORT'), 'user': os.getenv('POSTGRES_TEST_USER'), 'password': os.getenv('POSTGRES_TEST_PASS'), 'database': os.getenv('POSTGRES_TEST_DBNAME')}}, 'schema': 'test_logging', 'table': 'run_log'}, 'project': {'id': 'project id', 'name': 'Postgres to postgres', 'owner': 'somebody@yourcompany.com', 'temp_path': '/Users/mikaelene/Dev/eneel_projects/tempfiles', 'keep_tempfiles': False, 'csv_delimiter': '|', 'parallel_loads': 2, 'source': 'pg_source', 'source_columntypes_to_exclude': 'timestamp, boolean', 'target': 'pg_target', 'logdb': 'pg_logging', 'logtable': 'run_log'}, 'schema': {'source_schema': 'test_run_load', 'target_schema': 'test_run_load_target'}, 'table': {'table_name': 'test1', 'replication_method': 'FULL_TABLE', 'parallelization_key': 'id_col'}, 'temp_path': tmp_path, 'project_started_at': datetime.datetime(2019, 10, 11, 19, 31, 15, 809923)}
+    project_load = {
+        "load_order": 1,
+        "num_tables_to_load": 2,
+        "project_name": "test_project",
+        "source_conninfo": {
+            "name": "source",
+            "type": "postgres",
+            "read_only": None,
+            "target": "dev",
+            "credentials": {
+                "host": os.getenv("POSTGRES_TEST_HOST"),
+                "port": os.getenv("POSTGRES_TEST_PORT"),
+                "user": os.getenv("POSTGRES_TEST_USER"),
+                "password": os.getenv("POSTGRES_TEST_PASS"),
+                "database": os.getenv("POSTGRES_TEST_DBNAME"),
+                "table_parallel_loads": 10,
+                "table_parallel_batch_size": 500,
+            },
+        },
+        "target_conninfo": {
+            "name": "target",
+            "type": "postgres",
+            "read_only": None,
+            "target": "dev",
+            "credentials": {
+                "host": os.getenv("POSTGRES_TEST_HOST"),
+                "port": os.getenv("POSTGRES_TEST_PORT"),
+                "user": os.getenv("POSTGRES_TEST_USER"),
+                "password": os.getenv("POSTGRES_TEST_PASS"),
+                "database": os.getenv("POSTGRES_TEST_DBNAME"),
+            },
+        },
+        "logdb": {
+            "conninfo": {
+                "name": "logging",
+                "type": "postgres",
+                "read_only": None,
+                "target": "dev",
+                "credentials": {
+                    "host": os.getenv("POSTGRES_TEST_HOST"),
+                    "port": os.getenv("POSTGRES_TEST_PORT"),
+                    "user": os.getenv("POSTGRES_TEST_USER"),
+                    "password": os.getenv("POSTGRES_TEST_PASS"),
+                    "database": os.getenv("POSTGRES_TEST_DBNAME"),
+                },
+            },
+            "schema": "test_logging",
+            "table": "run_log",
+        },
+        "project": {
+            "id": "project id",
+            "name": "Postgres to postgres",
+            "owner": "somebody@yourcompany.com",
+            "temp_path": "/Users/mikaelene/Dev/eneel_projects/tempfiles",
+            "keep_tempfiles": False,
+            "csv_delimiter": "|",
+            "parallel_loads": 2,
+            "source": "pg_source",
+            "source_columntypes_to_exclude": "timestamp, boolean",
+            "target": "pg_target",
+            "logdb": "pg_logging",
+            "logtable": "run_log",
+        },
+        "schema": {
+            "source_schema": "test_run_load",
+            "target_schema": "test_run_load_target",
+        },
+        "table": {
+            "table_name": "test1",
+            "replication_method": "FULL_TABLE",
+            "parallelization_key": "id_col",
+        },
+        "temp_path": tmp_path,
+        "project_started_at": datetime.datetime(2019, 10, 11, 19, 31, 15, 809923),
+    }
 
     current_run_dir = os.getcwd()
     run_dir = os.fspath(tmp_path)
@@ -140,11 +218,12 @@ def project_load(tmp_path):
 @pytest.fixture
 def db(tmp_path):
     db = Database(
-        os.getenv('POSTGRES_TEST_HOST'),
-        os.getenv('POSTGRES_TEST_USER'),
-        os.getenv('POSTGRES_TEST_PASS'),
-        os.getenv('POSTGRES_TEST_DBNAME'),
-        os.getenv('POSTGRES_TEST_PORT'))
+        os.getenv("POSTGRES_TEST_HOST"),
+        os.getenv("POSTGRES_TEST_USER"),
+        os.getenv("POSTGRES_TEST_PASS"),
+        os.getenv("POSTGRES_TEST_DBNAME"),
+        os.getenv("POSTGRES_TEST_PORT"),
+    )
 
     setup_sql = """
     drop schema if exists load_runner cascade;
@@ -193,12 +272,21 @@ def db(tmp_path):
     db.execute(setup_sql)
 
     # export table
-    table_columns = db.table_columns('load_runner', 'test1')
-    _, _, _, _ = export_table("ERROR", 1, 1, db, 'load_runner', 'test1',
-                              table_columns, tmp_path, '|',
-                              replication_key=None,
-                              max_replication_key=None,
-                              parallelization_key=None)
+    table_columns = db.table_columns("load_runner", "test1")
+    _, _, _, _ = export_table(
+        "ERROR",
+        1,
+        1,
+        db,
+        "load_runner",
+        "test1",
+        table_columns,
+        tmp_path,
+        "|",
+        replication_key=None,
+        max_replication_key=None,
+        parallelization_key=None,
+    )
 
     yield db
 
@@ -214,71 +302,124 @@ def db(tmp_path):
 
 
 def test_export_table(db, tmp_path):
-    table_columns = db.table_columns('load_runner', 'test1')
-    return_code, temp_path_load, delimiter, export_row_count = export_table("ERROR", 1, 1, db, 'load_runner', 'test1',
-                                                                            table_columns, tmp_path, '|',
-                                                                            replication_key=None,
-                                                                            max_replication_key=None,
-                                                                            parallelization_key=None)
-    assert return_code == 'RUN'
+    table_columns = db.table_columns("load_runner", "test1")
+    return_code, temp_path_load, delimiter, export_row_count = export_table(
+        "ERROR",
+        1,
+        1,
+        db,
+        "load_runner",
+        "test1",
+        table_columns,
+        tmp_path,
+        "|",
+        replication_key=None,
+        max_replication_key=None,
+        parallelization_key=None,
+    )
+    assert return_code == "RUN"
     assert temp_path_load == tmp_path
-    assert delimiter == '|'
+    assert delimiter == "|"
     assert export_row_count == 3
 
 
 def test_create_temp_table(db):
-    table_columns = db.table_columns('load_runner', 'test1')
-    return_code = create_temp_table("ERROR", 1, 1, db, 'load_runner', 'test1_tmp_tmp', table_columns, 'load_runner.test1')
+    table_columns = db.table_columns("load_runner", "test1")
+    return_code = create_temp_table(
+        "ERROR",
+        1,
+        1,
+        db,
+        "load_runner",
+        "test1_tmp_tmp",
+        table_columns,
+        "load_runner.test1",
+    )
 
-    assert return_code == 'RUN'
-    assert db.check_table_exist('load_runner.test1') is True
+    assert return_code == "RUN"
+    assert db.check_table_exist("load_runner.test1") is True
 
 
 def test_import_into_temp_table(db, tmp_path):
     # import into tmp table
-    return_code, import_row_count = import_into_temp_table("ERROR", 1, 1, db, 'load_runner', 'test1_tmp_empty', tmp_path, '|',
-                                                           'load_runner.test1_tmp')
+    return_code, import_row_count = import_into_temp_table(
+        "ERROR",
+        1,
+        1,
+        db,
+        "load_runner",
+        "test1_tmp_empty",
+        tmp_path,
+        "|",
+        "load_runner.test1_tmp",
+    )
 
-    assert return_code == 'RUN'
+    assert return_code == "RUN"
     assert import_row_count == 3
 
 
 def test_switch_table(db, tmp_path):
-    return_code = switch_table("ERROR", 1, 1, db, 'load_runner', 'test1', 'test1_tmp_test', 'load_runner.test1')
+    return_code = switch_table(
+        "ERROR", 1, 1, db, "load_runner", "test1", "test1_tmp_test", "load_runner.test1"
+    )
 
-    assert return_code == 'RUN'
+    assert return_code == "RUN"
 
 
 def test_insert_from_table_and_drop_tmp(db, tmp_path):
-    return_code = insert_from_table_and_drop_tmp("ERROR", 1, 1, db, 'load_runner', 'test1', 'test1_tmp_test',
-                                                 'load_runner.test1')
+    return_code = insert_from_table_and_drop_tmp(
+        "ERROR", 1, 1, db, "load_runner", "test1", "test1_tmp_test", "load_runner.test1"
+    )
 
-    assert return_code == 'RUN'
+    assert return_code == "RUN"
 
 
 def test_strategy_full_table_load(db, tmp_path):
-    table_columns = db.table_columns('load_runner', 'test1')
-    full_load_path = tmp_path /'full_load'
+    table_columns = db.table_columns("load_runner", "test1")
+    full_load_path = tmp_path / "full_load"
     full_load_path.mkdir()
-    return_code, export_row_count, import_row_count = strategy_full_table_load("ERROR", 1, 1, db, 'load_runner',
-                                                                               'test1', table_columns, full_load_path, '|',
-                                                                               db, 'load_runner', 'test1_target',
-                                                                               'id_col')
+    return_code, export_row_count, import_row_count = strategy_full_table_load(
+        "ERROR",
+        1,
+        1,
+        db,
+        "load_runner",
+        "test1",
+        table_columns,
+        full_load_path,
+        "|",
+        db,
+        "load_runner",
+        "test1_target",
+        "id_col",
+    )
 
-    assert return_code == 'DONE'
+    assert return_code == "DONE"
     assert export_row_count == 3
     assert import_row_count == 3
 
 
 def test_strategy_incremental(db, tmp_path):
-    table_columns = db.table_columns('load_runner', 'test1_inc_test')
-    inc_load_path = tmp_path / 'inc_load'
+    table_columns = db.table_columns("load_runner", "test1_inc_test")
+    inc_load_path = tmp_path / "inc_load"
     inc_load_path.mkdir()
-    return_code, export_row_count, import_row_count = strategy_incremental("ERROR", 1, 1, db, 'load_runner',
-                                                                               'test1_inc_test', table_columns,
-                                                                               inc_load_path, '|', db, 'load_runner',
-                                                                               'test1', 'id_col', 'id_col')
-    assert return_code == 'DONE'
+    return_code, export_row_count, import_row_count = strategy_incremental(
+        "ERROR",
+        1,
+        1,
+        db,
+        "load_runner",
+        "test1_inc_test",
+        table_columns,
+        inc_load_path,
+        "|",
+        db,
+        "load_runner",
+        "test1",
+        "id_col",
+        "id_col",
+    )
+    assert return_code == "DONE"
     assert export_row_count == 2
     assert import_row_count == 2
 
@@ -286,12 +427,11 @@ def test_strategy_incremental(db, tmp_path):
 def test_run_load(project_load):
     return_code = run_load(project_load)
 
-    assert return_code == 'DONE'
+    assert return_code == "DONE"
 
 
 def test_run_project(run_project_fixture, tmp_path):
-    connections_path = tmp_path / 'connections.yml'
-    run_project('test_project', connections_path)
+    connections_path = tmp_path / "connections.yml"
+    run_project("test_project", connections_path)
 
-    assert run_project_fixture.check_table_exist('run_project_tgt.test1') is True
-
+    assert run_project_fixture.check_table_exist("run_project_tgt.test1") is True
