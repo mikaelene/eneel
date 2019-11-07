@@ -75,45 +75,51 @@ def run_import_file(
 
 
 def run_export_query(
-    driver,
-    server,
-    database,
-    port,
-    user,
-    password,
-    trusted_connection,
-    query,
-    file_path,
-    delimiter,
-    rows=5000,
+        server,
+        user,
+        password,
+        trusted_connection,
+        query,
+        file_path,
+        delimiter,
+        codepage='65001',
 ):
-    try:
-        db = Database(
-            driver,
-            server,
-            database,
-            port,
-            limit_rows=None,
-            user=user,
-            password=password,
-            trusted_connection=trusted_connection,
-        )
-        export = db.cursor.execute(query)
-        rowcounts = 0
-        while True:
-            try:
-                fetched_rows = export.fetchmany(rows)
-                rowcount = utils.export_csv(fetched_rows, file_path, delimiter)
-                if not fetched_rows:
-                    db.close()
-                    return rowcounts
-                rowcounts = rowcounts + rowcount
-            except Exception as e:
-                logger.error(e)
-                db.close()
-                return rowcounts
-    except Exception as e:
-        logger.error(e)
+    # Export data
+    # Generate bcp command
+    bcp_out = ['bcp']
+    bcp_out.append(query)
+    bcp_out.append('queryout')
+    bcp_out.append(file_path)
+    bcp_out.append('-t' + delimiter)
+    bcp_out.append('-c')
+    bcp_out.append('-C' + codepage)
+    bcp_out.append('-S' + server)
+    if trusted_connection:
+        bcp_out.append('-T')
+    else:
+        bcp_out.append('-U' + user)
+        bcp_out.append('-P' + password)
+
+    logger.debug(bcp_out)
+
+    cmd_code, cmd_message = utils.run_cmd(bcp_out)
+    if cmd_code == 0:
+        try:
+            return_message = cmd_message.splitlines()
+            row_count = int(return_message[-3].split()[0])
+            timing = str(return_message[-1].split()[5])
+            if row_count > 0:
+                average = str(return_message[-1].split()[8][1:-3])
+            else:
+                average = '0'
+            logger.debug(query + ": " + str(
+                row_count) + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
+            return row_count
+        except:
+            logger.warning(query + ": " + "Failed to parse sucessfull export cmd for")
+        logger.debug(query + " exported")
+    else:
+        logger.error("Error exportng " + query + " :" + cmd_message)
 
 
 def python_type_to_db_type(python_type):
@@ -325,8 +331,8 @@ class Database:
         for column in columns:
             data_type = column[2]
             character_maximum_length = column[3]
-            # if data_type == 'str' and character_maximum_length > 8000:
-            #    columns_to_keep.remove(column)
+            if data_type == 'str' and character_maximum_length > 4000:
+                columns_to_keep.remove(column)
             if data_type == "bytearray":
                 columns_to_keep.remove(column)
         return columns_to_keep
@@ -456,19 +462,15 @@ class Database:
                 select_stmt += " AND " + where
         return select_stmt
 
-    def export_query(self, query, file_path, delimiter, rows=5000):
+    def export_query(self, query, file_path, delimiter):
         rowcounts = run_export_query(
-            self._driver,
             self._server,
-            self._database,
-            self._port,
             self._user,
             self._password,
             self._trusted_connection,
             query,
             file_path,
             delimiter,
-            rows,
         )
         return rowcounts
 

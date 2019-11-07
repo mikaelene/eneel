@@ -1,5 +1,6 @@
 import eneel.utils as utils
-from concurrent.futures import ThreadPoolExecutor as Executor
+from concurrent.futures import ThreadPoolExecutor as ThreadExecutor
+from concurrent.futures import ProcessPoolExecutor as ProcessExecutor
 import os
 import eneel.printer as printer
 from time import time
@@ -74,7 +75,7 @@ def run_project(project_name, connections_path=None, target=None):
 
     # Execute parallel load
     load_results = []
-    with Executor(max_workers=workers) as executor:
+    with ProcessExecutor(max_workers=workers) as executor:
         for result in executor.map(run_load, project.loads):
             load_results.append(result)
 
@@ -213,7 +214,7 @@ def export_table(
                 table_workers = len(querys)
 
             try:
-                with Executor(max_workers=table_workers) as executor:
+                with ThreadExecutor(max_workers=table_workers) as executor:
                     for row_count in executor.map(
                         source.export_query, querys, file_paths, csv_delimiters
                     ):
@@ -345,7 +346,7 @@ def import_into_temp_table(
         total_row_count = 0
 
         try:
-            with Executor(max_workers=table_workers) as executor:
+            with ThreadExecutor(max_workers=table_workers) as executor:
                 for row_count in executor.map(
                     target.import_file,
                     target_schemas,
@@ -849,6 +850,14 @@ def run_load(project_load):
 
     # Set load starttime
     load_start_time = time()
+
+    # Start logger. Seems to persist over load jobs when process are reused
+    import eneel.logger as logger
+    logger = logger.get_logger(project_name)
+
+    # Remove duplicated handler if any
+    for handler in logger.handlers[2:]:
+        logger.removeHandler(handler)
 
     # Connect to databases
     source = config.connection_from_config(source_conninfo)
