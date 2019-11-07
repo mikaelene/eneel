@@ -1,5 +1,6 @@
 import eneel.load_runner as load_runner
 import argparse
+from pkg_resources import get_distribution
 
 
 def main():
@@ -35,7 +36,7 @@ def main():
         import eneel.printer as printer
 
         printer.print_msg("")
-        printer.print_msg("Running eneel ")
+        printer.print_msg("Running eneel " +get_distribution('eneel').version)
         printer.print_msg("")
         logger.debug("Loading project: " + project_name)
         try:
