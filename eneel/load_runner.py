@@ -703,7 +703,7 @@ def strategy_incremental(
             printer.print_load_line(
                 index,
                 total,
-                return_code,
+                "RUN",
                 full_target_table,
                 msg="does not exist in target. Starts FULL_TABLE load",
             )
