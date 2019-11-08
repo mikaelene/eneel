@@ -1,12 +1,13 @@
 #!/usr/scripts/env python
 from setuptools import find_packages
 from distutils.core import setup
+from eneel import __version__
 
 import os
 eneel_path = os.path.join(os.path.expanduser('~'), '.eneel')
 
 package_name = "eneel"
-package_version = "0.1.2"
+package_version = __version__
 description = """A package for fast loading av relational data"""
 
 setup(
