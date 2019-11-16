@@ -12,7 +12,7 @@ logger = logging.getLogger("main_logger")
 
 def run_export_cmd(cmd_commands):
     envs = [['NLS_LANG', 'SWEDISH_SWEDEN.WE8ISO8859P1']]
-    print(cmd_commands)
+    logger.debug(cmd_commands)
     cmd_code, cmd_message = utils.run_cmd(cmd_commands, envs)
     if cmd_code == 0:
         logger.debug(cmd_commands[2] + " exported")
@@ -46,7 +46,7 @@ def generate_spool_query(query, delimiter):
     #select_stmt = "SELECT " + query_cols_spool + " FROM " + query_from
     select_stmt += ";\n"
 
-    print(select_stmt)
+    logger.debug(select_stmt)
 
     return select_stmt
 
@@ -72,7 +72,7 @@ spool """
     spool_cmd += "spool off\n"
     spool_cmd += "exit"
     logger.debug(spool_cmd)
-    print(spool_cmd)
+    logger.debug(spool_cmd)
     return spool_cmd
 
 
@@ -88,7 +88,6 @@ def generate_cmd_command(server, user, password, database, port, sql_file):
 def run_export_query(
     server, user, password, database, port, query, file_path, delimiter
 ):
-    print(query)
     # Generate SQL statement for extract
     select_stmt = generate_spool_query(query, delimiter)
 
