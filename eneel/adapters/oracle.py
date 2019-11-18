@@ -11,7 +11,7 @@ logger = logging.getLogger("main_logger")
 
 
 def run_export_cmd(cmd_commands):
-    envs = [['NLS_LANG', 'SWEDISH_SWEDEN.WE8ISO8859P1']]
+    envs = [['NLS_LANG', 'SWEDISH_SWEDEN.AL32UTF8']]
     logger.debug(cmd_commands)
     cmd_code, cmd_message = utils.run_cmd(cmd_commands, envs)
     if cmd_code == 0:
@@ -27,10 +27,10 @@ def generate_spool_query(query, delimiter):
     # Generate SQL statement for extract
 
     # From
-    query_from = query.split(' FROM', 1)[1]
+    query_from = query.split(' FROM ', 1)[1]
 
     # Columns
-    query_cols = query.split('SELECT ', 1)[1].split(' FROM')[0]
+    query_cols = query.split('SELECT ', 1)[1].split(' FROM ')[0]
     columns = query_cols.split(', ')
     #query_cols_spool = query_cols.replace(', ', " || '" + delimiter + "' || \n")
 
@@ -140,7 +140,7 @@ class Database:
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
 
-            os.environ["NLS_LANG"] = "AMERICAN_AMERICA.WE8ISO8859P1"
+            os.environ["NLS_LANG"] = "SWEDISH_SWEDEN.AL32UTF8"
             self._conn = cx_Oracle.connect(user, password, server_db)
 
             self._conn.outputtypehandler = output_type_handler
