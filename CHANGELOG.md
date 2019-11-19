@@ -1,3 +1,12 @@
+## eneel 0.1.3 (November 8, 2019)
+
+### Overview
+
+Switched back to spool for oracle exports. 
+
+### Changed:
+- Switched back to Oracle Spool for exports from Oracle. The performance were much better when loading many tables in parallel. This have some limitations and needs more settings in formats and codepage settings.
+
 ## eneel 0.1.2 (November 8, 2019)
 
 ### Overview
