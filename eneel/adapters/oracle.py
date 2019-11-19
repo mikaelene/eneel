@@ -55,6 +55,7 @@ def generate_spool_cmd(file_path, select_stmt):
     spool_cmd = """
 alter session set NLS_NUMERIC_CHARACTERS = '. ';
 alter session set NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF';
+alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
 set markup csv on quote off
 set term off
 set echo off
