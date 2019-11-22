@@ -280,7 +280,7 @@ def export_query(
         #                                        replication_key, max_replication_key)
         total_row_count = source.export_query(query, file_path, csv_delimiter)
 
-        if total_row_count:
+        if total_row_count is not None:
             return_code = "RUN"
         else:
             return_code = "ERROR"

@@ -10,27 +10,99 @@ import logging
 logger = logging.getLogger("main_logger")
 
 
+def run_export_cmd(cmd_commands):
+    envs = [['NLS_LANG', 'SWEDISH_SWEDEN.AL32UTF8']]
+    logger.debug(cmd_commands)
+    cmd_code, cmd_message = utils.run_cmd(cmd_commands, envs)
+    if cmd_code == 0:
+        logger.debug(cmd_commands[2] + " exported")
+        return 0
+    else:
+        logger.error(
+            "Error exportng " + cmd_commands[2] + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
+        return 0
+
+
+def generate_spool_query(query, delimiter):
+    # Generate SQL statement for extract
+
+    # From
+    query_from = query.split(' FROM ', 1)[1]
+
+    # Columns
+    query_cols = query.split('SELECT ', 1)[1].split(' FROM ')[0]
+    columns = query_cols.split(', ')
+    #query_cols_spool = query_cols.replace(', ', " || '" + delimiter + "' || \n")
+
+    select_stmt = "SELECT "
+    for col in columns[:-1]:
+        column_name = col
+        select_stmt += "REPLACE(" + column_name + ",chr(0),'')" + " || '" + delimiter + "' || \n"
+    last_column_name = "REPLACE(" + columns[-1:][0] + ",chr(0),'')"
+    select_stmt += last_column_name
+    select_stmt += " FROM " + query_from
+
+    # Pack it up
+    #select_stmt = "SELECT " + query_cols_spool + " FROM " + query_from
+    select_stmt += ";\n"
+
+    logger.debug(select_stmt)
+
+    return select_stmt
+
+
+def generate_spool_cmd(file_path, select_stmt):
+    spool_cmd = """
+alter session set NLS_NUMERIC_CHARACTERS = '. ';
+alter session set NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF';
+alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
+set markup csv on quote off
+set term off
+set echo off
+set trimspool on 
+set trimout on
+set feedback off
+Set serveroutput off
+set heading off
+set arraysize 5000
+SET LONG 32767 
+spool """
+
+    spool_cmd += file_path + '\n'
+    spool_cmd += select_stmt
+    spool_cmd += "spool off\n"
+    spool_cmd += "exit"
+    logger.debug(spool_cmd)
+    logger.debug(spool_cmd)
+    return spool_cmd
+
+
+def generate_cmd_command(server, user, password, database, port, sql_file):
+    server_db = "{}:{}/{}".format(server, port, database)
+    cmd = 'sqlplus'
+    ora_conn = user + "/" + password + "@//" + server_db
+    sqlfile = '@' + sql_file
+    cmd_to_run = [cmd, ora_conn, sqlfile]
+    return cmd_to_run
+
+
 def run_export_query(
-    server, user, password, database, port, query, file_path, delimiter, rows=5000
+    server, user, password, database, port, query, file_path, delimiter
 ):
-    try:
-        db = Database(server, user, password, database, port)
-        export = db.cursor.execute(query)
-        rowcounts = 0
-        while True:
-            try:
-                fetched_rows = export.fetchmany(rows)
-                rowcount = utils.export_csv(fetched_rows, file_path, delimiter)
-                if not fetched_rows:
-                    db.close()
-                    return rowcounts
-                rowcounts = rowcounts + rowcount
-            except Exception as e:
-                logger.error(e)
-                db.close()
-                return rowcounts
-    except Exception as e:
-        logger.error(e)
+    # Generate SQL statement for extract
+    select_stmt = generate_spool_query(query, delimiter)
+
+    spool_cmd = generate_spool_cmd(file_path, select_stmt)
+
+    sql_file = file_path.replace('.csv', '.sql')
+    with open(sql_file, "w") as text_file:
+        text_file.write(spool_cmd)
+
+    cmd_commands = generate_cmd_command(server, user, password, database, port, sql_file)
+
+    total_row_count = run_export_cmd(cmd_commands)
+
+    return total_row_count
 
 
 def output_type_handler(cursor, name, defaultType, size, precision, scale):
@@ -69,7 +141,7 @@ class Database:
             self._table_parallel_loads = table_parallel_loads
             self._table_parallel_batch_size = table_parallel_batch_size
 
-            os.environ["NLS_LANG"] = "AMERICAN_AMERICA.WE8ISO8859P1"
+            os.environ["NLS_LANG"] = "SWEDISH_SWEDEN.AL32UTF8"
             self._conn = cx_Oracle.connect(user, password, server_db)
 
             self._conn.outputtypehandler = output_type_handler
@@ -220,7 +292,8 @@ class Database:
         for column in columns:
             data_type = column[2]
             character_maximum_length = column[3]
-            if data_type == "str" and character_maximum_length > 8000:
+            if data_type == "str" and character_maximum_length > 4000 \
+                    or data_type == "str" and character_maximum_length == -1:
                 columns_to_keep.remove(column)
             if data_type in ("bytearray"):
                 columns_to_keep.remove(column)
@@ -321,8 +394,10 @@ class Database:
 
         return select_stmt
 
-    def export_query(self, query, file_path, delimiter, rows=5000):
-        rowcounts = run_export_query(
+    def export_query(self, query, file_path, delimiter):
+        rowcounts = 0
+        #rowcounts = run_export_query(
+        run_export_query(
             self._server,
             self._user,
             self._password,
@@ -331,7 +406,6 @@ class Database:
             query,
             file_path,
             delimiter,
-            rows=5000,
         )
         return rowcounts
 
