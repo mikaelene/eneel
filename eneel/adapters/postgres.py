@@ -31,24 +31,18 @@ def run_import_file(
 def run_export_query(
     server, user, password, database, port, query, file_path, delimiter, rows=5000
 ):
+    db = Database(server, user, password, database, port)
+    # Create and run the cmd
+    sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
+    file = open(file_path, "w", encoding="utf-8")
     try:
-        db = Database(server, user, password, database, port)
-        db.cursor.execute(query)
-        rowcounts = 0
-        while True:
-            try:
-                fetched_rows = db.cursor.fetchmany(rows)
-                rowcount = utils.export_csv(fetched_rows, file_path, delimiter)
-                if not fetched_rows:
-                    db.close()
-                    return rowcounts
-                rowcounts = rowcounts + rowcount
-            except Exception as e:
-                logger.error(e)
-                db.close()
-                return rowcounts
-    except Exception as e:
+        db.cursor.copy_expert(sql=sql % (query, delimiter), file=file)
+        row_count = db.cursor.rowcount
+        return row_count
+    except psycopg2.Error as e:
         logger.error(e)
+    finally:
+        db.close()
 
 
 def python_type_to_db_type(python_type):
@@ -76,6 +70,29 @@ def python_type_to_db_type(python_type):
         return "interval"
     else:
         return python_type
+
+
+def db_type_to_python_type(db_type):
+    if db_type[:3] == "int":
+        return "int"
+    elif "char" in db_type:
+        return "str"
+    elif db_type == "text":
+        return "str"
+    elif db_type in "numeric":
+        return "decimal.Decimal"
+    elif db_type == "date":
+        return "datetime.date"
+    elif db_type == "time":
+        return "datetime.time"
+    elif db_type == "timestamp":
+        return "datetime.datetime"
+    elif db_type == "uuid":
+        return "UUID.uuid"
+    elif db_type == "interval":
+        return "timedelta"
+    else:
+        return db_type
 
 
 class Database:
@@ -205,7 +222,7 @@ class Database:
 
     def query_columns(self, query):
         try:
-            query = "SELECT * FROM (" + query + ") q fetch first 1 row only"
+            query = "SELECT * FROM (" + query + ") q fetch first 1000 row only"
             self.execute(query)
             data = self.fetchone()
             cursor_columns = self.cursor.description
@@ -219,10 +236,13 @@ class Database:
                 ordinal_position = i
                 column_name = cursor_columns[i][0]
                 data_type = re.findall(r"'(.+?)'", str(type(data[i])))[0]
+                if data_type == 'NoneType':
+                    oid = cursor_columns[i][1]
+                    self.execute('select typname from pg_type where oid = ' + str(oid))
+                    db_type = self.fetchone()[0]
+                    data_type = db_type_to_python_type(db_type)
                 if data_type == "str":
                     character_maximum_length = cursor_columns[i][3]
-                #    if character_maximum_length == -1:
-                #        data_type = "text"
                 else:
                     character_maximum_length = None
                 if data_type in ("decimal.Decimal", "decimal", "int"):
@@ -233,7 +253,6 @@ class Database:
                     numeric_scale = cursor_columns[i][5]
                 else:
                     numeric_scale = None
-                # data_type = python_type_to_db_type(data_type)
 
                 column = (
                     ordinal_position + 1,
