@@ -72,6 +72,29 @@ def python_type_to_db_type(python_type):
         return python_type
 
 
+def db_type_to_python_type(db_type):
+    if db_type[:3] == "int":
+        return "int"
+    elif "char" in db_type:
+        return "str"
+    elif db_type == "text":
+        return "str"
+    elif db_type in "numeric":
+        return "decimal.Decimal"
+    elif db_type == "date":
+        return "datetime.date"
+    elif db_type == "time":
+        return "datetime.time"
+    elif db_type == "timestamp":
+        return "datetime.datetime"
+    elif db_type == "uuid":
+        return "UUID.uuid"
+    elif db_type == "interval":
+        return "timedelta"
+    else:
+        return db_type
+
+
 class Database:
     def __init__(
         self,
@@ -213,10 +236,13 @@ class Database:
                 ordinal_position = i
                 column_name = cursor_columns[i][0]
                 data_type = re.findall(r"'(.+?)'", str(type(data[i])))[0]
+                if data_type == 'NoneType':
+                    oid = cursor_columns[i][1]
+                    self.execute('select typname from pg_type where oid = ' + str(oid))
+                    db_type = self.fetchone()[0]
+                    data_type = db_type_to_python_type(db_type)
                 if data_type == "str":
                     character_maximum_length = cursor_columns[i][3]
-                #    if character_maximum_length == -1:
-                #        data_type = "text"
                 else:
                     character_maximum_length = None
                 if data_type in ("decimal.Decimal", "decimal", "int"):
@@ -227,7 +253,6 @@ class Database:
                     numeric_scale = cursor_columns[i][5]
                 else:
                     numeric_scale = None
-                # data_type = python_type_to_db_type(data_type)
 
                 column = (
                     ordinal_position + 1,
