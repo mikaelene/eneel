@@ -31,24 +31,18 @@ def run_import_file(
 def run_export_query(
     server, user, password, database, port, query, file_path, delimiter, rows=5000
 ):
+    db = Database(server, user, password, database, port)
+    # Create and run the cmd
+    sql = "COPY (%s) TO STDIN WITH DELIMITER AS '%s'"
+    file = open(file_path, "w", encoding="utf-8")
     try:
-        db = Database(server, user, password, database, port)
-        db.cursor.execute(query)
-        rowcounts = 0
-        while True:
-            try:
-                fetched_rows = db.cursor.fetchmany(rows)
-                rowcount = utils.export_csv(fetched_rows, file_path, delimiter)
-                if not fetched_rows:
-                    db.close()
-                    return rowcounts
-                rowcounts = rowcounts + rowcount
-            except Exception as e:
-                logger.error(e)
-                db.close()
-                return rowcounts
-    except Exception as e:
+        db.cursor.copy_expert(sql=sql % (query, delimiter), file=file)
+        row_count = db.cursor.rowcount
+        return row_count
+    except psycopg2.Error as e:
         logger.error(e)
+    finally:
+        db.close()
 
 
 def python_type_to_db_type(python_type):
@@ -205,7 +199,7 @@ class Database:
 
     def query_columns(self, query):
         try:
-            query = "SELECT * FROM (" + query + ") q fetch first 1 row only"
+            query = "SELECT * FROM (" + query + ") q fetch first 1000 row only"
             self.execute(query)
             data = self.fetchone()
             cursor_columns = self.cursor.description
