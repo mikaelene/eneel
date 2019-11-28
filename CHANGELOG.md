@@ -1,9 +1,12 @@
-## eneel 0.1.4 (xxx)
+## eneel 0.1.4 (November 28, 2019)
 
 ### Overview
 
+Fix release
+
 ### Fixes:
 - Columns with all nulls in postgres didn't get a datatype, but now a datatype gets inferred from the postgres oid.
+- Oracle has better support for queries.
 
 ### Changed:
 - Switched back to copy_expert for exports from Postgres. 
