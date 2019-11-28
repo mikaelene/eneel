@@ -31,19 +31,22 @@ def generate_spool_query(query, delimiter):
 
     # Columns
     query_cols = query.split('SELECT ', 1)[1].split(' FROM ')[0]
-    columns = query_cols.split(', ')
-    #query_cols_spool = query_cols.replace(', ', " || '" + delimiter + "' || \n")
+    columns = re.split('(?<!\(.),(?!.\))', query_cols)
+
+    for index, col in enumerate(columns):
+        col_parts = col.strip().split(' ')
+        if len(col_parts) > 1:
+            columns[index] = ' '.join(col_parts[:-1])
+        # print(columns[index])
 
     select_stmt = "SELECT "
     for col in columns[:-1]:
+        # print(col)
         column_name = col
         select_stmt += "REPLACE(" + column_name + ",chr(0),'')" + " || '" + delimiter + "' || \n"
     last_column_name = "REPLACE(" + columns[-1:][0] + ",chr(0),'')"
     select_stmt += last_column_name
     select_stmt += " FROM " + query_from
-
-    # Pack it up
-    #select_stmt = "SELECT " + query_cols_spool + " FROM " + query_from
     select_stmt += ";\n"
 
     logger.debug(select_stmt)
