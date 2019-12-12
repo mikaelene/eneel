@@ -236,6 +236,7 @@ def export_table(
                 replication_key,
                 max_replication_key,
             )
+            logger.debug('Export query: ' + query)
 
             total_row_count = source.export_query(query, file_path, csv_delimiter)
 
@@ -699,6 +700,8 @@ def strategy_incremental(
             max_replication_key = target.get_max_column_value(
                 full_target_table, replication_key
             )
+            logger.debug(full_target_table + ' Max ' + replication_key + ' = ' + max_replication_key)
+
         else:
             max_replication_key = None
             printer.print_load_line(
