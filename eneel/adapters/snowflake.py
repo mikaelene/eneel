@@ -91,9 +91,16 @@ def run_import_file(account,
             + ") on_error = 'skip_file';"
         )
         print(copy_sql)
-        db.execute(copy_sql)
+        sfqid = db.execute(copy_sql).sfqid
         print("copy table success")
-        row_count = db.cursor.rowcount
+
+        logger.debug('Snowflake copy query id: ' + sfqid)
+        sfqid = "'" + sfqid + "'"
+
+        qstring = 'SELECT "rows_parsed","rows_loaded" FROM  TABLE(RESULT_SCAN({}))'
+        rows_parsed, rows_loaded = db.execute(qstring.format(sfqid)).fetchone()
+
+        row_count = rows_loaded
 
         # remove stage
         drop_stage_sql = "DROP STAGE IF EXISTS " + table_stage
