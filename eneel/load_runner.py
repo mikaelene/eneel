@@ -181,6 +181,7 @@ def export_table(
                     + source_table
                     + "_"
                     + str(batch_id)
+                    + "_"
                     + ".csv"
                 )
                 file_path = os.path.join(temp_path_load, file_name)

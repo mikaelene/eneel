@@ -126,7 +126,7 @@ def run_import_file(account,
         return row_count
 
     except:
-        logger.error("Failed importing table")
+        logger.error("Failed importing file: " + file_path)
         return row_count
 
 
