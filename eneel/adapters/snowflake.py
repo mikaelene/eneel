@@ -29,10 +29,16 @@ def run_import_file(account,
         schema,
     )
     try:
+        # Uppercase table
         schema_table = schema_table.upper()
 
+        # File dir and name
+        path_parts = os.path.split(file_path)
+        file_dir = path_parts[0]
+        file_name = path_parts[1]
+
         # Tablename underscored
-        table_name_text = database + "_" + schema_table.replace('.', '_')
+        table_name_text = file_name.replace('.', '_')
 
         # Fileformat
         table_format = table_name_text + "_format"
@@ -59,8 +65,7 @@ def run_import_file(account,
         db.execute(create_stage_sql)
 
         # Split files
-        path_parts = os.path.split(file_path)
-        file_dir = path_parts[0]
+
 
         fs = FileSplit(file=file_path, splitsize=50000000, output_dir=file_dir)
         fs.split()
