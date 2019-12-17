@@ -41,28 +41,34 @@ def run_import_file(account,
         table_name_text = file_name.replace('.', '_')
 
         # Fileformat
-        table_format = table_name_text + "_format"
-        create_format_sql = (
-            "create or replace file format "
-            + table_format
-            + " type = 'CSV' field_delimiter = '"
-            + delimiter
-            + "' skip_header = 1; "
-        )
-        logger.debug(create_format_sql)
-        db.execute(create_format_sql)
+        try:
+            table_format = table_name_text + "_format"
+            create_format_sql = (
+                "create or replace file format "
+                + table_format
+                + " type = 'CSV' field_delimiter = '"
+                + delimiter
+                + "' skip_header = 1; "
+            )
+            logger.debug(create_format_sql)
+            db.execute(create_format_sql)
+        except:
+            logger.error('Failed create fileformat: ' + file_path)
 
         # Stage
-        table_stage = table_name_text + "_stage"
-        create_stage_sql = (
-            "create or replace stage "
-            + table_stage
-            + " file_format = "
-            + table_format
-            + ";"
-        )
-        logger.debug(create_stage_sql)
-        db.execute(create_stage_sql)
+        try:
+            table_stage = table_name_text + "_stage"
+            create_stage_sql = (
+                "create or replace stage "
+                + table_stage
+                + " file_format = "
+                + table_format
+                + ";"
+            )
+            logger.debug(create_stage_sql)
+            db.execute(create_stage_sql)
+        except:
+            logger.error('Failed create stage: ' + file_path)
 
         # Split files
 
@@ -73,41 +79,49 @@ def run_import_file(account,
         os.remove(file_path)
 
         # put
-        files = file_path[:-4] + "*.csv"
-        put_sql = (
-            "PUT file://" + files + " @" + table_stage + " auto_compress=true;"
-        )
-        logger.debug(put_sql)
-        db.execute(put_sql)
+        try:
+            files = file_path[:-4] + "*.csv"
+            put_sql = (
+                "PUT file://" + files + " @" + table_stage + " auto_compress=true;"
+            )
+            logger.debug(put_sql)
+            db.execute(put_sql)
+        except:
+            logger.error('Failed PUT: ' + file_path)
 
         # copy
-        copy_sql = (
-            "COPY INTO "
-            + schema_table
-            + " FROM @"
-            + table_stage
-            + " file_format = (format_name = "
-            + table_format
-            + ") on_error = 'CONTINUE';"
-        )
-        logger.debug(copy_sql)
-        sfqid = db.execute(copy_sql).sfqid
-        logger.debug("copy table success")
+        try:
+            copy_sql = (
+                "COPY INTO "
+                + schema_table
+                + " FROM @"
+                + table_stage
+                + " file_format = (format_name = "
+                + table_format
+                + ") on_error = 'CONTINUE';"
+            )
+            logger.debug(copy_sql)
+            sfqid = db.execute(copy_sql).sfqid
+            logger.debug("copy table success")
 
-        logger.debug('Snowflake copy query id: ' + sfqid)
-        sfqid = "'" + sfqid + "'"
+            logger.debug('Snowflake copy query id: ' + sfqid)
+            sfqid = "'" + sfqid + "'"
+        except:
+            logger.error('Failed COPY: ' + file_path)
 
-        #qstring = 'SELECT sum("rows_parsed") as "rows_parsed", sum("rows_loaded") as rows_loaded FROM  TABLE(RESULT_SCAN({}))'
-        qstring = 'SELECT * FROM TABLE(RESULT_SCAN({}))'
-        load_result = db.execute(qstring.format(sfqid)).fetchall()
+        try:
+            qstring = 'SELECT * FROM TABLE(RESULT_SCAN({}))'
+            load_result = db.execute(qstring.format(sfqid)).fetchall()
 
-        for res in load_result:
-            logger.debug(res)
+            for res in load_result:
+                logger.debug(res)
 
-        row_count = sum([row[3] for row in load_result])
+            row_count = sum([row[3] for row in load_result])
 
-        if len([row[1] for row in load_result if row[1] == 'LOAD_FAILED']) > 0:
-            logger.error('Load completed with errors')
+            if len([row[1] for row in load_result if row[1] == 'LOAD_FAILED']) > 0:
+                logger.error('Load completed with errors')
+        except:
+            logger.error('Failed getting load results: ' + file_path)
 
         # remove stage
         drop_stage_sql = "DROP STAGE IF EXISTS " + table_stage
