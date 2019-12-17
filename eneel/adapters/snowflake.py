@@ -59,17 +59,16 @@ def run_import_file(account,
         db.execute(create_stage_sql)
 
         # Split files
-        file_abs = file_path
-        file_name_local = file_abs.split("/")[-1]
-        file_dir = file_abs.replace(file_name_local, "")
+        path_parts = os.path.split(file_path)
+        file_dir = path_parts[0]
 
-        fs = FileSplit(file=file_abs, splitsize=50000000, output_dir=file_dir)
+        fs = FileSplit(file=file_path, splitsize=50000000, output_dir=file_dir)
         fs.split()
 
-        os.remove(file_abs)
+        os.remove(file_path)
 
         # put
-        files = file_abs[:-4] + "*.csv"
+        files = file_path[:-4] + "*.csv"
         put_sql = (
             "PUT file://" + files + " @" + table_stage + " auto_compress=true;"
         )
