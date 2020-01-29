@@ -285,3 +285,28 @@ def insert_from_table_and_drop_tmp(
         )
     finally:
         return return_code
+
+
+def merge_from_table_and_drop_tmp(
+    return_code,
+    index,
+    total,
+    target,
+    target_schema,
+    target_table,
+    target_table_tmp,
+    load_name,
+    primary_key,
+):
+    try:
+        return_code = target.merge_from_table_and_drop(
+            target_schema, target_table, target_table_tmp, primary_key
+        )
+    except:
+        return_code = "ERROR"
+        printer.print_load_line(
+            index, total, "ERROR", load_name, msg="failed merge from temptable"
+        )
+    finally:
+        return return_code
+
