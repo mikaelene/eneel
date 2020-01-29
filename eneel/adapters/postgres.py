@@ -272,9 +272,9 @@ class Database:
         for column in columns:
             data_type = column[2]
             character_maximum_length = column[3]
-            if data_type == "str" and character_maximum_length > 8000:
+            if data_type == "str" and character_maximum_length > 4000:
                 columns_to_keep.remove(column)
-            if data_type == "bytearray":
+            if data_type in ("bytes", "bytearray", "memoryview", "buffer", "bytea"):
                 columns_to_keep.remove(column)
         return columns_to_keep
 

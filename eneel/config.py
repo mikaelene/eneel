@@ -4,6 +4,7 @@ import eneel.utils as utils
 import eneel.adapters.postgres as postgres
 import eneel.adapters.oracle as oracle
 import eneel.adapters.sqlserver as sqlserver
+import eneel.adapters.snowflake as snowflake
 
 import logging
 
@@ -39,7 +40,7 @@ def connection_from_config(connection_info):
     port = connection_info["credentials"].get("port")
     limit_rows = connection_info.get("credentials").get("limit_rows")
     table_where_clause = connection_info.get("credentials").get("table_where_clause")
-    read_only = connection_info.get("read_only")
+    read_only = connection_info.get("read_only", False)
     type = connection_info.get("type")
     table_parallel_loads = connection_info.get("credentials").get(
         "table_parallel_loads", 10
@@ -93,6 +94,21 @@ def connection_from_config(connection_info):
             read_only,
             table_parallel_loads,
             table_parallel_batch_size,
+        )
+    elif connection_info.get('type') == 'snowflake':
+        account = connection_info['credentials'].get('account')
+        warehouse = connection_info['credentials'].get('warehouse')
+        schema = connection_info['credentials'].get('schema')
+        return snowflake.Database(
+            account,
+            user,
+            password,
+            database,
+            warehouse,
+            schema,
+            limit_rows,
+            read_only,
+            table_parallel_loads,
         )
     else:
         logger.error("source type not found")

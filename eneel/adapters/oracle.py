@@ -298,7 +298,7 @@ class Database:
             if data_type == "str" and character_maximum_length > 4000 \
                     or data_type == "str" and character_maximum_length == -1:
                 columns_to_keep.remove(column)
-            if data_type in ("bytearray"):
+            if data_type in ("bytes", "bytearray", "memoryview", "buffer"):
                 columns_to_keep.remove(column)
         return columns_to_keep
 

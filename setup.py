@@ -26,6 +26,8 @@ setup(
         'cx-Oracle>=7.0.0',
         'PyYAML>=3.11',
         'colorama>=0.3.9',
+        'snowflake-connector-python>=1.8.4',
+        'filesplit>=2.0.',
     ],
     entry_points={
             'console_scripts': ['eneel=eneel.main:main'],
