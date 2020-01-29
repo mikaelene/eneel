@@ -494,6 +494,50 @@ class Database:
         finally:
             return return_code
 
+    def merge_from_table_and_drop(self, schema, to_table, from_table, primary_key):
+        if self._read_only:
+            sys.exit("This source is readonly. Terminating load run")
+
+        to_schema_table = schema + "." + to_table
+        from_schema_table = schema + "." + from_table
+
+        columns = self.table_columns(schema, to_table)[1]
+        columns -= primary_key
+
+        on_stmt = "ON "
+        for i, col in enumerate(primary_key):
+            if i:
+                on_stmt += " and "
+            on_stmt += f"t.{col} = s.{col}"
+        on_stmt = on_stmt[:-5]
+
+        update_stmt = "WHEN MATCHED " \
+                      " THEN UPDATE SET\n"
+        for col in columns:
+            update_stmt += f"t.{col} = s.{col},\n"
+        update_stmt = update_stmt[:-1]
+
+        insert_stmt = "WHEN NOT MATCHED BY TARGET " \
+                      " THEN INSERT ("
+        for col in columns:
+            insert_stmt += f"{col}, "
+        insert_stmt = insert_stmt[:-2] + ")\n VALUES("
+        for col in columns:
+            insert_stmt += f"{s.col}, "
+        insert_stmt = insert_stmt[:-2] + ")"
+
+        merge_stmt = f"MERGE {to_schema_table} t USING {from_schema_table} s\n{on_stmt}\n{update_stmt}\n{insert_stmt}"
+        print(merge_stmt)
+        try:
+            self.execute(merge_stmt)
+            self.execute("DROP TABLE " + from_schema_table)
+            return_code = "RUN"
+        except:
+            logger.error("Failed to merge_from_table_and_drop")
+            return_code = "ERROR"
+        finally:
+            return return_code
+
     def switch_tables(self, schema, old_table, new_table):
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
