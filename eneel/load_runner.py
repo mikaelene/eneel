@@ -138,11 +138,6 @@ def run_project(project_name, connections_path=None, target=None):
         logdb.close()
 
 
-
-
-
-
-
 def run_load(project_load):
     # Common attributes
     load_order = project_load.get("load_order")
@@ -227,6 +222,7 @@ def run_load(project_load):
         replication_method = table.get("replication_method", "FULL_TABLE")
         parallelization_key = table.get("parallelization_key")
         replication_key = table.get("replication_key")
+        primary_key = table.get("primary_key")
 
         return_code = "START"
         table_msg = full_source_table + " (" + replication_method + ")"
@@ -267,6 +263,26 @@ def run_load(project_load):
                 target_table,
                 replication_key=replication_key,
                 parallelization_key=parallelization_key,
+            )
+
+        # Upsert replication
+        elif replication_method == "UPSERT":
+            return_code, export_row_count, import_row_count = load_strategies.strategy_incremental(
+                return_code,
+                index,
+                total,
+                source,
+                source_schema,
+                source_table,
+                columns,
+                temp_path_load,
+                csv_delimiter,
+                target,
+                target_schema,
+                target_table,
+                replication_key=replication_key,
+                parallelization_key=parallelization_key,
+                primary_key=primary_key,
             )
 
         else:
