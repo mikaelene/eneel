@@ -490,7 +490,8 @@ def strategy_upsert(
             )
             return return_code, export_row_count, import_row_count
 
-        if primary_key not in [column[1] for column in columns]:
+        #if primary_key not in [column[1] for column in columns]:
+        if set(primary_key).issubset([row[1] for row in columns]) is False:
             printer.print_load_line(
                 index,
                 total,

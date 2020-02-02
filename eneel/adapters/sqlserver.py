@@ -377,10 +377,16 @@ class Database:
 
     def get_max_column_value(self, table_name, column):
         try:
-            sql = "SELECT cast(MAX(" + column + ") as varchar(max)) FROM " + table_name
+            #sql = "SELECT cast(MAX(" + column + ") as varchar(max)) FROM " + table_name
+            sql = f"SELECT MAX({column}) FROM {table_name}"
             max_value = self.query(sql)
-            logger.debug("Max " + column + " is " + str(max_value[0][0]))
-            return max_value[0][0]
+            type_max_value = type(max_value[0][0])
+            if str(type_max_value) == "<class 'datetime.datetime'>":
+                max_value_return = str(max_value[0][0])[:-3]
+            else:
+                max_value_return = str(max_value[0][0])
+            logger.debug("Max " + column + " is " + max_value_return)
+            return max_value_return
         except:
             logger.debug("Failed getting max column value")
 
@@ -501,21 +507,25 @@ class Database:
         to_schema_table = schema + "." + to_table
         from_schema_table = schema + "." + from_table
 
-        columns = self.table_columns(schema, to_table)[1]
-        columns -= primary_key
+        columns = self.table_columns(schema, to_table)
+        columns = [row[1] for row in columns]
+        columns = list(set(columns) - set(primary_key))
 
         on_stmt = "ON "
         for i, col in enumerate(primary_key):
             if i:
                 on_stmt += " and "
             on_stmt += f"t.{col} = s.{col}"
-        on_stmt = on_stmt[:-5]
+        if on_stmt[-5:] == " and ":
+            on_stmt = on_stmt[:-5]
+        #print(on_stmt)
 
         update_stmt = "WHEN MATCHED " \
                       " THEN UPDATE SET\n"
         for col in columns:
             update_stmt += f"t.{col} = s.{col},\n"
-        update_stmt = update_stmt[:-1]
+        update_stmt = update_stmt[:-2]
+        #print(update_stmt)
 
         insert_stmt = "WHEN NOT MATCHED BY TARGET " \
                       " THEN INSERT ("
@@ -523,11 +533,13 @@ class Database:
             insert_stmt += f"{col}, "
         insert_stmt = insert_stmt[:-2] + ")\n VALUES("
         for col in columns:
-            insert_stmt += f"{s.col}, "
+            insert_stmt += f"{col}, "
         insert_stmt = insert_stmt[:-2] + ")"
+        #print(insert_stmt)
 
-        merge_stmt = f"MERGE {to_schema_table} t USING {from_schema_table} s\n{on_stmt}\n{update_stmt}\n{insert_stmt}"
-        print(merge_stmt)
+        merge_stmt = f"MERGE {to_schema_table} t USING {from_schema_table} s\n{on_stmt}\n{update_stmt}\n{insert_stmt};"
+        logger.debug(merge_stmt)
+
         try:
             self.execute(merge_stmt)
             self.execute("DROP TABLE " + from_schema_table)

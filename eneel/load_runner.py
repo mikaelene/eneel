@@ -267,7 +267,7 @@ def run_load(project_load):
 
         # Upsert replication
         elif replication_method == "UPSERT":
-            return_code, export_row_count, import_row_count = load_strategies.strategy_incremental(
+            return_code, export_row_count, import_row_count = load_strategies.strategy_upsert(
                 return_code,
                 index,
                 total,
@@ -282,7 +282,7 @@ def run_load(project_load):
                 target_table,
                 replication_key=replication_key,
                 parallelization_key=parallelization_key,
-                primary_key=primary_key,
+                primary_key=[primary_key],
             )
 
         else:
