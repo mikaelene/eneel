@@ -1,3 +1,19 @@
+## eneel 0.1.5 ()
+
+### Overview
+
+Adding Snowflake to supported adapters!
+
+### Features:
+- Snowflake supported as target
+
+### Fixes:
+- Added logging of min, max values for parallell loads
+
+### Changed:
+- Logfiles older then 10 min will be removed when running again for getting a logfile of the complete run and nothing else  
+
+
 ## eneel 0.1.4 (November 28, 2019)
 
 ### Overview
