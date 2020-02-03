@@ -404,6 +404,7 @@ class Database:
                 + str(self._table_parallel_batch_size)
                 + ".0)) FROM "
                 + table_name
+                + " WITH (NOLOCK)"
             )
             res = self.query(sql)
             min_value = int(res[0][0])
