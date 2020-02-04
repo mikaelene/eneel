@@ -15,11 +15,12 @@ def run_export_cmd(cmd_commands):
     logger.debug(cmd_commands)
     cmd_code, cmd_message = utils.run_cmd(cmd_commands, envs)
     if cmd_code == 0:
-        logger.debug(cmd_commands[2] + " exported")
+        logger.debug(f"{cmd_commands[2]} exported")
         return 0
     else:
         logger.error(
-            "Error exportng " + cmd_commands[2] + " : cmd_code: " + str(cmd_code) + " cmd_message: " + cmd_message)
+            f"Error exportng {cmd_commands[2]} : cmd_code: {str(cmd_code)} cmd_message: {cmd_message}"
+        )
         return 0
 
 
@@ -37,17 +38,12 @@ def generate_spool_query(query, delimiter):
         col_parts = col.strip().split(' ')
         if len(col_parts) > 1:
             columns[index] = ' '.join(col_parts[:-1])
-        # print(columns[index])
 
     select_stmt = "SELECT "
     for col in columns[:-1]:
-        # print(col)
-        column_name = col
-        select_stmt += "REPLACE(" + column_name + ",chr(0),'')" + " || '" + delimiter + "' || \n"
-    last_column_name = "REPLACE(" + columns[-1:][0] + ",chr(0),'')"
-    select_stmt += last_column_name
-    select_stmt += " FROM " + query_from
-    select_stmt += ";\n"
+        select_stmt += F"REPLACE({col},chr(0),'') || '{delimiter}' || \n"
+    last_column_name = f"REPLACE({columns[-1:][0]},chr(0),'')"
+    select_stmt += f"REPLACE({columns[-1:][0]},chr(0),'') FROM {query_from};\n"
 
     logger.debug(select_stmt)
 
@@ -71,20 +67,15 @@ set arraysize 5000
 SET LONG 32767 
 spool """
 
-    spool_cmd += file_path + '\n'
-    spool_cmd += select_stmt
-    spool_cmd += "spool off\n"
-    spool_cmd += "exit"
-    logger.debug(spool_cmd)
+    spool_cmd += f"{file_path}\n{select_stmt}\nspool off\nexit"
     logger.debug(spool_cmd)
     return spool_cmd
 
 
 def generate_cmd_command(server, user, password, database, port, sql_file):
-    server_db = "{}:{}/{}".format(server, port, database)
-    cmd = 'sqlplus'
-    ora_conn = user + "/" + password + "@//" + server_db
-    sqlfile = '@' + sql_file
+    cmd = "sqlplus"
+    ora_conn = f"{user}/{password}@//{server}:{port}/{database}"
+    sqlfile = f'@{sql_file}'
     cmd_to_run = [cmd, ora_conn, sqlfile]
     return cmd_to_run
 
@@ -230,13 +221,13 @@ class Database:
             logger.error("Failed getting tables")
 
     def table_columns(self, schema, table):
-        query = "SELECT * FROM " + schema + "." + table
+        query = f"SELECT * FROM {schema}.{table}"
         columns = self.query_columns(query)
         return columns
 
     def query_columns(self, query):
         try:
-            query = "SELECT * FROM (" + query + ") q WHERE ROWNUM <= 1"
+            query = f"SELECT * FROM ({query}) q WHERE ROWNUM <= 1"
             cursor_columns = self.execute(query).description
         except:
             logger.error("Failed getting query columns")
@@ -305,12 +296,10 @@ class Database:
     def check_table_exist(self, table_name):
         try:
             check_statement = (
-                """
+                f"""
             SELECT 1
            FROM   ALL_TABLES 
-           WHERE  OWNER || '.' || TABLE_NAME = '"""
-                + table_name
-                + "'"
+           WHERE  OWNER || '.' || TABLE_NAME = '{table_name}'"""
             )
             exists = self.query(check_statement)
             if exists:
@@ -331,7 +320,7 @@ class Database:
 
     def get_min_max_column_value(self, table_name, column):
         try:
-            sql = "SELECT MIN(" + column + "), MAX(" + column + ") FROM " + table_name
+            sql = f"SELECT MIN({column}), MAX({column}) FROM {table_name}"
             res = self.query(sql)
             min_value = int(res[0][0])
             max_value = int(res[0][1])
@@ -341,15 +330,12 @@ class Database:
 
     def get_min_max_batch(self, table_name, column):
         try:
-            sql = "SELECT MIN(" + column + "), MAX(" + column
-            sql += "), ceil((max( " + column + ") - min("
-            sql += (
-                column
-                + ")) / (count(*)/"
-                + str(self._table_parallel_batch_size)
-                + ".0)) FROM "
-                + table_name
-            )
+            sql = f"SELECT " \
+                  f"MIN({column}), " \
+                  f"MAX({column}), " \
+                  f"ceil((max({column}) - min({column})) / " \
+                  f"(count(*)/{str(self._table_parallel_batch_size)}.0)) " \
+                  f"FROM {table_name}"
             res = self.query(sql)
             min_value = int(res[0][0])
             max_value = int(res[0][1])
@@ -372,28 +358,26 @@ class Database:
         # Add columns
         for col in columns:
             column_name = col[1]
-            select_stmt += column_name + ", "
+            select_stmt += f"{column_name}, "
         select_stmt = select_stmt[:-2]
 
-        select_stmt += " FROM " + schema + "." + table
+        select_stmt += f" FROM {schema}.{table}"
 
         # Where-claues for incremental replication
         if replication_key:
-            replication_where = (
-                replication_key + " > " + "'" + max_replication_key + "'"
-            )
+            replication_where = f"{replication_key} > '{max_replication_key}'"
         else:
             replication_where = None
 
         wheres = replication_where, self._table_where_clause, parallelization_where
         wheres = [x for x in wheres if x is not None]
         if len(wheres) > 0:
-            select_stmt += " WHERE " + wheres[0]
+            select_stmt += f" WHERE {wheres[0]}"
             for where in wheres[1:]:
-                select_stmt += " AND " + where
+                select_stmt += f" AND {where}"
 
         if self._limit_rows:
-            select_stmt += " FETCH FIRST " + str(self._limit_rows) + " ROW ONLY"
+            select_stmt += f" FETCH FIRST {str(self._limit_rows)} ROW ONLY"
 
         return select_stmt
 
