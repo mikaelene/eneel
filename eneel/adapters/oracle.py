@@ -51,7 +51,7 @@ def generate_spool_query(query, delimiter):
 
 
 def generate_spool_cmd(file_path, select_stmt):
-    spool_cmd = """
+    spool_cmd = f"""
 alter session set NLS_NUMERIC_CHARACTERS = '. ';
 alter session set NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF';
 alter session set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
@@ -65,9 +65,8 @@ Set serveroutput off
 set heading off
 set arraysize 5000
 SET LONG 32767 
-spool """
+spool {file_path}\n{select_stmt}\nspool off\nexit"""
 
-    spool_cmd += f"{file_path}\n{select_stmt}\nspool off\nexit"
     logger.debug(spool_cmd)
     return spool_cmd
 
