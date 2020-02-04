@@ -33,7 +33,7 @@ def export_table(
                 max_parallelization_key,
                 batch_size_key,
             ) = source.get_min_max_batch(
-                source_schema + "." + source_table, parallelization_key
+                f"{source_schema}.{source_table}", parallelization_key
             )
             batch_id = 1
             batch_start = min_parallelization_key
@@ -44,25 +44,14 @@ def export_table(
 
             while batch_start <= max_parallelization_key:
                 file_name = (
-                    source._database
-                    + "_"
-                    + source_schema
-                    + "_"
-                    + source_table
-                    + "_"
-                    + str(batch_id)
-                    + "_"
-                    + ".csv"
+                    f"{source._database}_{source_schema}_{source_table}_"
+                    f"{str(batch_id)}_.csv"
                 )
                 file_path = os.path.join(temp_path_load, file_name)
 
                 # parallelization_where = source.get_parallelization_where(batch_start, batch_size_key)
                 parallelization_where = (
-                    parallelization_key
-                    + " between "
-                    + str(batch_start)
-                    + " and "
-                    + str(batch_start + batch_size_key - 1)
+                    f"{parallelization_key} between {str(batch_start)} and {str(batch_start + batch_size_key - 1)}"
                 )
                 query = source.generate_export_query(
                     columns,
@@ -96,7 +85,7 @@ def export_table(
         else:
 
             file_name = (
-                source._database + "_" + source_schema + "_" + source_table + ".csv"
+                f"{source._database}_{source_schema}_{source_table}.csv"
             )
             file_path = os.path.join(temp_path_load, file_name)
 
@@ -107,14 +96,14 @@ def export_table(
                 replication_key,
                 max_replication_key,
             )
-            logger.debug('Export query: ' + query)
+            logger.debug(f"Export query: {query}")
 
             total_row_count = source.export_query(query, file_path, csv_delimiter)
 
         return_code = "RUN"
     except:
         return_code = "ERROR"
-        full_source_table = source_schema + "." + source_table
+        full_source_table = f"{source_schema}.{source_table}"
         printer.print_load_line(
             index, total, return_code, full_source_table, msg="failed to export"
         )
@@ -145,7 +134,7 @@ def export_query(
                 msg="parallelization not implemented",
             )
 
-        file_name = load_name + ".csv"
+        file_name = f"{load_name}.csv"
         file_path = os.path.join(temp_path_load, file_name)
 
         # query = source.generate_export_query(columns, source_schema, source_table,
