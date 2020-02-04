@@ -27,11 +27,11 @@ def strategy_full_table_load(
     import_row_count = 0
 
     # Full source table
-    full_source_table = source_schema + "." + source_table
+    full_source_table = f"{source_schema}.{source_table}"
 
     try:
         # Temp table
-        target_table_tmp = target_table + "_tmp"
+        target_table_tmp = f"{target_table}_tmp"
 
         # Export table
         try:
@@ -148,7 +148,7 @@ def strategy_full_query_load(
 
     try:
         # Temp table
-        target_table_tmp = target_table + "_tmp"
+        target_table_tmp = f"{target_table}_tmp"
 
         # Export table
         try:
@@ -257,13 +257,13 @@ def strategy_incremental(
     export_row_count = 0
     import_row_count = 0
 
-    full_source_table = source_schema + "." + source_table
+    full_source_table = f"{source_schema}.{source_table}"
 
     try:
         # Temp table
-        target_table_tmp = target_table + "_tmp"
+        target_table_tmp = f"{target_table}_tmp"
 
-        full_target_table = target_schema + "." + target_table
+        full_target_table = f"{target_schema}.{target_table}"
 
         if not replication_key:
             printer.print_load_line(
@@ -290,7 +290,7 @@ def strategy_incremental(
             max_replication_key = target.get_max_column_value(
                 full_target_table, replication_key
             )
-            logger.debug(full_target_table + ' Max ' + replication_key + ' = ' + max_replication_key)
+            logger.debug(f"{full_target_table} Max {replication_key} = {max_replication_key}")
 
         else:
             max_replication_key = None
@@ -435,13 +435,13 @@ def strategy_upsert(
     export_row_count = 0
     import_row_count = 0
 
-    full_source_table = source_schema + "." + source_table
+    full_source_table = f"{source_schema}.{source_table}"
 
     try:
         # Temp table
-        target_table_tmp = target_table + "_tmp"
+        target_table_tmp = f"{target_table}_tmp"
 
-        full_target_table = target_schema + "." + target_table
+        full_target_table = f"{target_schema}.{target_table}"
 
         if not replication_key:
             printer.print_load_line(
@@ -468,7 +468,7 @@ def strategy_upsert(
             max_replication_key = target.get_max_column_value(
                 full_target_table, replication_key
             )
-            logger.debug(full_target_table + ' Max ' + replication_key + ' = ' + max_replication_key)
+            logger.debug(f"{full_target_table} Max {replication_key} = {max_replication_key}")
 
         else:
             max_replication_key = None
