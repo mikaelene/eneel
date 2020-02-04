@@ -23,14 +23,8 @@ def run_project(project_name, connections_path=None, target=None):
     project = config.Project(project_name, connections.connections)
 
     printer.print_msg(
-        "Running "
-        + project.project_name
-        + " with "
-        + str(project.num_tables_to_load)
-        + " loadjobs from "
-        + project.source_name
-        + " to "
-        + project.target_name
+        f"Running {project.project_name} with {str(project.num_tables_to_load)}"
+        f" loadjobs from {project.source_name} to {project.target_name}"
     )
     printer.print_msg("")
 
@@ -40,11 +34,7 @@ def run_project(project_name, connections_path=None, target=None):
     if project.num_tables_to_load < workers:
         workers = project.num_tables_to_load
     start_msg = (
-        "Start loading "
-        + str(project.num_tables_to_load)
-        + " tables with "
-        + str(workers)
-        + " parallel workers"
+        f"Start loading {str(project.num_tables_to_load)} tables with {str(workers)} parallel workers"
     )
     printer.print_output_line(start_msg)
 
@@ -101,17 +91,10 @@ def run_project(project_name, connections_path=None, target=None):
     execution_time = job_end_time - job_start_time
     status_time = " in {execution_time:0.2f}s".format(execution_time=execution_time)
     end_msg = (
-        "Finished loading "
-        + str(project.num_tables_to_load)
-        + " tables in "
-        + status_time
-        + ": "
-        + str(load_successes)
-        + " successful, "
-        + str(load_warnings)
-        + " with warnings and "
-        + str(load_errors)
-        + " with errors"
+        f"Finished loading {str(project.num_tables_to_load)} tables in "
+        f"{status_time}: {str(load_successes)} successful, "
+        f"{str(load_warnings)} with warnings and "
+        f"{str(load_errors)} with errors"
     )
     printer.print_output_line("")
     printer.print_output_line(end_msg)

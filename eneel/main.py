@@ -36,9 +36,9 @@ def main():
         import eneel.printer as printer
 
         printer.print_msg("")
-        printer.print_msg("Running eneel " +get_distribution('eneel').version)
+        printer.print_msg(f"Running eneel {get_distribution('eneel').version}")
         printer.print_msg("")
-        logger.debug("Loading project: " + project_name)
+        logger.debug(f"Loading project: {project_name}")
         try:
             load_runner.run_project(
                 project_name, connections_path=connections, target=target
