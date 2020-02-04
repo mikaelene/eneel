@@ -39,7 +39,7 @@ def print_load_line(
     index, total, status, table, rows=None, execution_time=None, truncate=False, msg=""
 ):
     if execution_time is not None and rows is not None:
-        rows_per_sec = "at " + str(int(int(rows) / execution_time)) + " rows/sec"
+        rows_per_sec = f"at {str(int(int(rows) / execution_time))} rows/sec"
     else:
         rows_per_sec = ""
     if index is None or total is None:
@@ -58,7 +58,7 @@ def print_load_line(
     truncate_width = PRINTER_WIDTH - 3
     justified = prefix.ljust(PRINTER_WIDTH, ".")
     if truncate and len(justified) > truncate_width:
-        justified = justified[:truncate_width] + "..."
+        justified = f"{justified[:truncate_width]}..."
 
     if execution_time is None:
         status_time = ""
@@ -72,13 +72,13 @@ def print_load_line(
     #            rows_per_sec=rows_per_sec)
 
     if status == "DONE":
-        rows = get_color("green") + rows + COLOR_RESET_ALL
+        rows = f"{get_color('green')}{rows}{COLOR_RESET_ALL}"
         output_txt = rows
     elif status == "WARN":
-        rows = get_color("yellow") + rows + COLOR_RESET_ALL
+        rows = f"{get_color('yellow')}{rows}{COLOR_RESET_ALL}"
         output_txt = rows
     elif status == "ERROR":
-        output_txt = get_color("red") + status + COLOR_RESET_ALL
+        output_txt = f"{get_color('red')}{status}{COLOR_RESET_ALL}"
     else:
         output_txt = "RUN"
 
@@ -92,5 +92,5 @@ def print_load_line(
 def print_msg(msg, color=None):
     if color:
         color = get_color(color)
-        msg = color + msg + COLOR_RESET_ALL
+        msg = f"{color}{msg}{COLOR_RESET_ALL}"
     logger.info(msg)

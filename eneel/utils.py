@@ -45,7 +45,7 @@ def load_yaml(stream):
 
 def load_file_contents(path, strip=True):
     if not os.path.exists(path):
-        logger.error(path + " not found")
+        logger.error(f"{path} not found")
 
     with open(path, "rb") as handle:
         to_return = handle.read().decode("utf-8")
@@ -105,7 +105,6 @@ def export_csv(rows, filename, delimiter="|"):
             csv_file.write(csv_row + "\n")
         csv_file.close()
         rowcount = len(rows)
-        # logger.info(str(rowcount) + " rows added to " + filename)
         return rowcount
     except Exception as e:
         logger.error(e)
