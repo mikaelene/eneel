@@ -23,7 +23,7 @@ def get_project(project):
     else:
         try:
             project_file_contents = utils.load_file_contents(
-                project + ".yml", strip=False
+                f"{project}.yml", strip=False
             )
             project = utils.load_yaml(project_file_contents)
 
