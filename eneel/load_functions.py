@@ -35,6 +35,7 @@ def export_table(
             ) = source.get_min_max_batch(
                 f"{source_schema}.{source_table}", parallelization_key
             )
+            logger.debug(f"{source_schema}.{source_table} parallelization_key=  {parallelization_key}, min: {min_parallelization_key}, max: {max_parallelization_key}, batch_size: {batch_size_key}")
             batch_id = 1
             batch_start = min_parallelization_key
 
