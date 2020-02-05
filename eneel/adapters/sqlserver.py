@@ -399,7 +399,7 @@ class Database:
                   f"MAX({column}), " \
                   f"CEILING((max({column}) - min({column})) / " \
                   f"(count(*)/{str(self._table_parallel_batch_size)}.0)) " \
-                  f"FROM {table_name}"
+                  f"FROM {table_name} WITH (NOLOCK)"
             res = self.query(sql)
             min_value = int(res[0][0])
             max_value = int(res[0][1])
