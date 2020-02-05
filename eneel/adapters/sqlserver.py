@@ -26,19 +26,19 @@ def run_import_file(
     try:
         # Import data
         bcp_in = ["bcp"]
-        bcp_in.append("[" + database + "].[" + schema + "].[" + table + "]")
+        bcp_in.append(f"[{database}].[{schema}].[{table}]")
         bcp_in.append("in")
         bcp_in.append(file_path)
-        bcp_in.append("-t" + delimiter)
+        bcp_in.append(f"-t{delimiter}")
         bcp_in.append("-c")
-        bcp_in.append("-C" + codepage)
+        bcp_in.append(f"-C{codepage}")
         bcp_in.append("-b100000")
-        bcp_in.append("-S" + server)
+        bcp_in.append(f"-S{server}")
         if trusted_connection:
             bcp_in.append("-T")
         else:
-            bcp_in.append("-U" + user)
-            bcp_in.append("-P" + password)
+            bcp_in.append(f"-U{user}")
+            bcp_in.append(f"-P{password}")
 
         logger.debug(bcp_in)
         cmd_code, cmd_message = utils.run_cmd(bcp_in)
@@ -50,11 +50,7 @@ def run_import_file(
                 errors = cmd_message.count("Error")
                 if errors > 0:
                     logger.error(
-                        "Importing in "
-                        + schema
-                        + "."
-                        + table
-                        + " completed with errors"
+                        f"Importing in {schema}.{table} completed with errors"
                     )
                 return_message = cmd_message.splitlines()
                 try:
@@ -65,9 +61,9 @@ def run_import_file(
                         logger.debug(cmd_message)
                         return_code = "WARN"
             except:
-                logger.warning(table + ": " + "Failed to parse sucessfull import cmd")
+                logger.warning(f"{table}: Failed to parse sucessfull import cmd")
         else:
-            logger.error("Error importing " + schema + "." + table)
+            logger.error(f"Error importing {schema}.{table}")
             logger.debug(cmd_message)
     except:
         logger.error("Failed importing table")
@@ -112,14 +108,13 @@ def run_export_query(
                 average = str(return_message[-1].split()[8][1:-3])
             else:
                 average = '0'
-            logger.debug(query + ": " + str(
-                row_count) + " rows exported, in " + timing + " ms. at an average of " + average + " rows per sec")
+            logger.debug(f"{query}: {str(row_count)} rows exported, in {timing} ms. at an average of {average} rows per sec")
             return row_count
         except:
-            logger.warning(query + ": " + "Failed to parse sucessfull export cmd for")
-        logger.debug(query + " exported")
+            logger.warning(f"{query} : Failed to parse sucessfull export cmd for")
+        logger.debug(f"{query} exported")
     else:
-        logger.error("Error exportng " + query + " :" + cmd_message)
+        logger.error(f"Error exportng {query}: {cmd_message}")
 
 
 def python_type_to_db_type(python_type):
@@ -179,7 +174,7 @@ class Database:
             if trusted_connection:
                 conn_string += ";trusted_connection=yes"
             else:
-                conn_string += ";UID=" + user + ";PWD=" + password
+                conn_string += f";UID={user};PWD={password}"
             self._driver = driver
             self._server = server
             self._user = user
@@ -201,7 +196,7 @@ class Database:
 
             self._conn = pyodbc.connect(conn_string, autocommit=True)
             self._cursor = self._conn.cursor()
-            logger.debug("Connection to sqlserver successful")
+            logger.debug(f"Connection to {self._server} successful")
         except pyodbc.Error as e:
             logger.error(e)
             sys.exit(1)
@@ -282,13 +277,13 @@ class Database:
             logger.error("Failed getting tables")
 
     def table_columns(self, schema, table):
-        query = "SELECT * FROM " + schema + "." + table
+        query = f"SELECT * FROM {schema}.{table}"
         columns = self.query_columns(query)
         return columns
 
     def query_columns(self, query):
         try:
-            query = "SELECT TOP 1 * FROM (" + query + ") q"
+            query = f"SELECT TOP 1 * FROM ({query}) q"
             cursor_columns = self.execute(query).description
         except:
             logger.error("Failed getting query columns")
@@ -339,11 +334,9 @@ class Database:
 
     def check_table_exist(self, table_name):
         try:
-            check_statement = """
-            SELECT 1
-            FROM   information_schema.tables 
-            WHERE  table_schema + '.' + table_name = '"""
-            check_statement += table_name + "'"
+            check_statement = f"""SELECT 1
+            FROM information_schema.tables 
+            WHERE table_schema + '.' + table_name = '{table_name}'"""
             exists = self.query(check_statement)
             if exists:
                 return True
@@ -356,9 +349,9 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
         try:
-            sql = "TRUNCATE TABLE " + table_name
+            sql = f"TRUNCATE TABLE {table_name}"
             self.execute(sql)
-            logger.debug("Table " + table_name + " truncated")
+            logger.debug(f"Table {table_name} truncated")
         except:
             logger.error("Failed truncating table")
 
@@ -369,15 +362,14 @@ class Database:
             if schema in self.schemas():
                 pass
             else:
-                create_statement = "CREATE SCHEMA " + schema
+                create_statement = f"CREATE SCHEMA {schema}"
                 self.execute(create_statement)
-                logger.debug("Schema" + schema + " created")
+                logger.debug(f"Schema {schema} created")
         except:
             logger.error("Failed creating schema")
 
     def get_max_column_value(self, table_name, column):
         try:
-            #sql = "SELECT cast(MAX(" + column + ") as varchar(max)) FROM " + table_name
             sql = f"SELECT MAX({column}) FROM {table_name}"
             max_value = self.query(sql)
             type_max_value = type(max_value[0][0])
@@ -385,14 +377,14 @@ class Database:
                 max_value_return = str(max_value[0][0])[:-3]
             else:
                 max_value_return = str(max_value[0][0])
-            logger.debug("Max " + column + " is " + max_value_return)
+            logger.debug(f"Max {column} is {max_value_return}")
             return max_value_return
         except:
             logger.debug("Failed getting max column value")
 
     def get_min_max_column_value(self, table_name, column):
         try:
-            sql = "SELECT MIN(" + column + "), MAX(" + column + ") FROM " + table_name
+            sql = f"SELECT MIN({column}), MAX({column}) FROM {table_name}"
             res = self.query(sql)
             min_value = int(res[0][0])
             max_value = int(res[0][1])
@@ -402,15 +394,12 @@ class Database:
 
     def get_min_max_batch(self, table_name, column):
         try:
-            sql = "SELECT MIN(" + column + "), MAX(" + column
-            sql += "), CEILING((max( " + column + ") - min("
-            sql += (
-                column
-                + ")) / (count(*)/"
-                + str(self._table_parallel_batch_size)
-                + ".0)) FROM "
-                + table_name
-            )
+            sql = f"SELECT " \
+                  f"MIN({column}), " \
+                  f"MAX({column}), " \
+                  f"CEILING((max({column}) - min({column})) / " \
+                  f"(count(*)/{str(self._table_parallel_batch_size)}.0)) " \
+                  f"FROM {table_name}"
             res = self.query(sql)
             min_value = int(res[0][0])
             max_value = int(res[0][1])
@@ -433,39 +422,28 @@ class Database:
 
         # Add limit
         if self._limit_rows:
-            select_stmt += "TOP " + str(self._limit_rows) + " "
+            select_stmt += f"TOP {str(self._limit_rows)} "
 
         # Add columns
         for col in columns:
-            column_name = "[" + col[1] + "]"
-            select_stmt += column_name + ", "
+            column_name = f"[{col[1]}], "
+            select_stmt += column_name
         select_stmt = select_stmt[:-2]
 
-        select_stmt += (
-            " FROM ["
-            + self._database
-            + "].["
-            + schema
-            + "].["
-            + table
-            + "]"
-            + " WITH (NOLOCK)"
-        )
+        select_stmt += f" FROM [{self._database}].[{schema}].[{table}] WITH (NOLOCK)"
 
         # Where-claues for incremental replication
         if replication_key:
-            replication_where = (
-                replication_key + " > " + "'" + max_replication_key + "'"
-            )
+            replication_where = f"{replication_key} > '{max_replication_key}'"
         else:
             replication_where = None
 
         wheres = replication_where, self._table_where_clause, parallelization_where
         wheres = [x for x in wheres if x is not None]
         if len(wheres) > 0:
-            select_stmt += " WHERE " + wheres[0]
+            select_stmt += f" WHERE {wheres[0]}"
             for where in wheres[1:]:
-                select_stmt += " AND " + where
+                select_stmt += f" AND {where}"
         return select_stmt
 
     def export_query(self, query, file_path, delimiter):
@@ -486,13 +464,10 @@ class Database:
         to_schema_table = schema + "." + to_table
         from_schema_table = schema + "." + from_table
         try:
-            self.execute(
-                "INSERT INTO "
-                + to_schema_table
-                + " SELECT * FROM  "
-                + from_schema_table
+            self.execute(f"INSERT INTO {to_schema_table} "
+                         f"SELECT * FROM {from_schema_table}"
             )
-            self.execute("DROP TABLE " + from_schema_table)
+            self.execute(f"DROP TABLE {from_schema_table}")
             return_code = "RUN"
         except:
             logger.error("Failed to insert_from_table_and_drop")
@@ -504,8 +479,8 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
 
-        to_schema_table = schema + "." + to_table
-        from_schema_table = schema + "." + from_table
+        to_schema_table = f"{schema}.{to_table}"
+        from_schema_table = f"{schema}.{from_table}"
 
         columns = self.table_columns(schema, to_table)
         columns = [row[1] for row in columns]
@@ -542,7 +517,7 @@ class Database:
 
         try:
             self.execute(merge_stmt)
-            self.execute("DROP TABLE " + from_schema_table)
+            self.execute(f"DROP TABLE {from_schema_table}")
             return_code = "RUN"
         except:
             logger.error("Failed to merge_from_table_and_drop")
@@ -554,25 +529,18 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
         try:
-
-            old_schema_table = schema + "." + old_table
-            new_schema_table = schema + "." + new_table
-            delete_table = old_table + "_delete"
-            delete_schema_table = schema + "." + delete_table
+            old_schema_table = f"{schema}.{old_table}"
+            new_schema_table = f"{schema}.{new_table}"
+            delete_table = f"{old_table}_delete"
+            delete_schema_table = f"{schema}.{delete_table}"
 
             if self.check_table_exist(old_schema_table):
-                self.execute(
-                    "EXEC sp_rename '" + old_schema_table + "', '" + delete_table + "'"
-                )
-                self.execute(
-                    "EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'"
-                )
-                self.execute("DROP TABLE " + delete_schema_table)
+                self.execute(f"EXEC sp_rename '{old_schema_table}', '{delete_table}'")
+                self.execute(f"EXEC sp_rename '{new_schema_table}', '{old_table}'")
+                self.execute(f"DROP TABLE {delete_schema_table}")
                 logger.debug("Switched tables")
             else:
-                self.execute(
-                    "EXEC sp_rename '" + new_schema_table + "', '" + old_table + "'"
-                )
+                self.execute(f"EXEC sp_rename '{new_schema_table}', '{old_table}'")
                 logger.debug("Renamed temp table")
             return_code = "RUN"
         except:
@@ -600,11 +568,11 @@ class Database:
 
     def generate_create_table_ddl(self, schema, table, columns):
         try:
-            create_table_sql = "CREATE TABLE " + schema + "." + table + "(\n"
+            create_table_sql = f"CREATE TABLE {schema}.{table} (\n"
             for col in columns:
 
                 ordinal_position = col[0]
-                column_name = "[" + col[1] + "]"
+                column_name = f"[{col[1]}]"
                 data_type = col[2]
                 data_type = python_type_to_db_type(data_type)
                 character_maximum_length = col[3]
@@ -613,30 +581,17 @@ class Database:
 
                 if data_type == "nvarchar":
                     if character_maximum_length <= 0 or character_maximum_length > 4000:
-                        column = column_name + " nvarchar(MAX)"
+                        column = f"{column_name} nvarchar(MAX)"
                     else:
-                        column = (
-                            column_name
-                            + " nvarchar"
-                            + "("
-                            + str(character_maximum_length)
-                            + ")"
-                        )
-                elif data_type == "numeric":
-                    column = (
-                        column_name
-                        + " numeric("
-                        + str(numeric_precision)
-                        + ","
-                        + str(numeric_scale)
-                        + ")"
-                    )
-                else:
-                    column = column_name + " " + data_type
+                        column = f"{column_name} nvarchar({str(character_maximum_length)})"
 
-                create_table_sql += column + ", \n"
-            create_table_sql = create_table_sql[:-3]
-            create_table_sql += ")"
+                elif data_type == "numeric":
+                    column = f"{column_name} numeric({str(numeric_precision)},{str(numeric_scale)})"
+                else:
+                    column = f"{column_name} {data_type}"
+
+                create_table_sql += f"{column}, \n"
+            create_table_sql = f"{create_table_sql[:-3]})"
 
             return create_table_sql
         except Exception as e:
@@ -657,29 +612,26 @@ class Database:
             table_exists = self.fetchone()
 
             if table_exists:
-                self.execute("DROP TABLE " + schema_table)
-                logger.debug("Table: " + schema_table + " droped")
+                self.execute(f"DROP TABLE {schema_table}")
+                logger.debug(f"Table: {schema_table} droped")
 
             self.create_schema(schema)
             create_table_sql = self.generate_create_table_ddl(schema, table, columns)
             logger.debug(create_table_sql)
             self.execute(create_table_sql)
-            logger.debug("Table: " + schema_table + " created")
+            logger.debug(f"Table: {schema_table} created")
 
             # Create Clustered Columnstore Index if set on connection
             if self._as_columnstore:
                 try:
-                    index_name = schema + "_" + table + "_cci"
+                    index_name = f"{schema}_{table}_cci"
                     self.execute(
-                        "DROP INDEX IF EXISTS " + index_name + " ON " + schema_table
+                        f"DROP INDEX IF EXISTS  {index_name} ON {schema_table}"
                     )
                     self.execute(
-                        "CREATE CLUSTERED COLUMNSTORE INDEX "
-                        + index_name
-                        + " ON "
-                        + schema_table
+                        f"CREATE CLUSTERED COLUMNSTORE INDEX {index_name} ON {schema_table}"
                     )
-                    logger.debug("Index: " + index_name + " created")
+                    logger.debug(f"Index: {index_name} created")
                 except:
                     logger.error("Failed create columnstoreindex")
         except:
@@ -689,13 +641,11 @@ class Database:
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
 
-        full_table = schema + "." + table
+        full_table = f"schema.{table}"
 
         if not self.check_table_exist(full_table):
             logger.debug("Log table exist")
-            ddl = "create table "
-            ddl += full_table
-            ddl += """(
+            ddl = f"""create table {full_table} (
             log_time    datetime2(6),
             project	varchar(128),
             project_started_at	datetime2(6),
@@ -710,11 +660,10 @@ class Database:
 
             self.create_schema(schema)
             self.execute(ddl)
-            logger.debug(full_table + " created")
+            logger.debug(f"{full_table} created")
 
-        view1_ddl = "create or alter view "
-        view1_ddl += full_table + "_summary as "
-        view1_ddl += """select
+        view1_ddl = f"""create or alter view {full_table}_summary as 
+select
 CONVERT(varchar(10),project_started_at,120) as project_started_date, 
 project_started_at, 
 project, 
@@ -725,18 +674,15 @@ CONVERT(varchar, dateadd(ms,datediff(ms , min(project_started_at), max(ended_at)
 sum(exported_rows) as exported_rows,
 sum(imported_rows) as imported_rows,
 sum(imported_rows) / datediff(second , min(project_started_at), max(ended_at)) as loaded_rows_per_sec
-from  """
-        view1_ddl += full_table
-        view1_ddl += """
+from  {full_table}
 group BY
 CONVERT(varchar(10),project_started_at,120), 
 project_started_at, 
 project"""
         self.execute(view1_ddl)
 
-        view2_ddl = "create or alter view "
-        view2_ddl += full_table + "_details as "
-        view2_ddl += """select
+        view2_ddl = f"""create or alter view {full_table}_details as 
+select
 CONVERT(varchar(10),project_started_at,120) as project_started_date, 
 project_started_at, 
 project,
@@ -749,9 +695,7 @@ status,
 exported_rows as exported_rows,
 imported_rows as imported_rows,
 imported_rows / datediff(second , started_at, ended_at) as loaded_rows_per_sec
-from  """
-        view2_ddl += full_table
-        view2_ddl += " where source_table is not null"
+from {full_table} where source_table is not null"""
         self.execute(view2_ddl)
 
     def log(
@@ -784,8 +728,8 @@ from  """
             imported_rows,
         ]
 
-        sql = "INSERT INTO " + full_table
-        sql += " (log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows)"
-        sql += " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        sql = f"""INSERT INTO {full_table} 
+(log_time, project, project_started_at, source_table, target_table, started_at, ended_at, status, exported_rows, imported_rows) 
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
         self.execute(sql, row)
