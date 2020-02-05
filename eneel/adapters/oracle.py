@@ -295,10 +295,7 @@ class Database:
     def check_table_exist(self, table_name):
         try:
             check_statement = (
-                f"""
-            SELECT 1
-           FROM   ALL_TABLES 
-           WHERE  OWNER || '.' || TABLE_NAME = '{table_name}'"""
+                f"""SELECT 1 FROM ALL_TABLES WHERE OWNER || '.' || TABLE_NAME = '{table_name}'"""
             )
             exists = self.query(check_statement)
             if exists:
