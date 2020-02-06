@@ -40,7 +40,7 @@ def run_import_file(
             bcp_in.append(f"-U{user}")
             bcp_in.append(f"-P{password}")
 
-        logger.debug(bcp_in)
+        #logger.debug(bcp_in)
         cmd_code, cmd_message = utils.run_cmd(bcp_in)
         return_code = "ERROR"
         row_count = 0
@@ -96,7 +96,7 @@ def run_export_query(
         bcp_out.append('-U' + user)
         bcp_out.append('-P' + password)
 
-    logger.debug(bcp_out)
+    #logger.debug(bcp_out)
 
     cmd_code, cmd_message = utils.run_cmd(bcp_out)
     if cmd_code == 0:
@@ -108,11 +108,11 @@ def run_export_query(
                 average = str(return_message[-1].split()[8][1:-3])
             else:
                 average = '0'
-            logger.debug(f"{query}: {str(row_count)} rows exported, in {timing} ms. at an average of {average} rows per sec")
+            #logger.debug(f"{query}: {str(row_count)} rows exported, in {timing} ms. at an average of {average} rows per sec")
             return row_count
         except:
             logger.warning(f"{query} : Failed to parse sucessfull export cmd for")
-        logger.debug(f"{query} exported")
+        #logger.debug(f"{query} exported")
     else:
         logger.error(f"Error exportng {query}: {cmd_message}")
 
@@ -210,7 +210,7 @@ class Database:
 
     def close(self):
         self._conn.close()
-        logger.debug("Connection closed")
+        logger.debug(f"Connection to {self._server} closed")
 
     @property
     def connection(self):
@@ -617,7 +617,7 @@ class Database:
 
             self.create_schema(schema)
             create_table_sql = self.generate_create_table_ddl(schema, table, columns)
-            logger.debug(create_table_sql)
+            #logger.debug(create_table_sql)
             self.execute(create_table_sql)
             logger.debug(f"Table: {schema_table} created")
 

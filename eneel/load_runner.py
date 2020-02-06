@@ -33,10 +33,9 @@ def run_project(project_name, connections_path=None, target=None):
     # Set number of workers
     if project.num_tables_to_load < workers:
         workers = project.num_tables_to_load
-    start_msg = (
-        f"Start loading {str(project.num_tables_to_load)} tables with {str(workers)} parallel workers"
-    )
-    printer.print_output_line(start_msg)
+
+    printer.print_output_line(f"Start loading {str(project.num_tables_to_load)} "
+                              f"tables with {str(workers)} parallel workers")
 
     # Job start time variable
     job_start_time = time()
@@ -123,14 +122,13 @@ def run_project(project_name, connections_path=None, target=None):
 
 def run_load(project_load):
     # Common attributes
-    load_order = project_load.get("load_order")
-    num_tables_to_load = project_load.get("num_tables_to_load")
+    index = project_load.get("load_order")
+    total = project_load.get("num_tables_to_load")
     project_name = project_load.get("project_name")
     project_started_at = project_load.get("project_started_at")
     project = project_load.get("project")
     temp_path = project_load.get("temp_path")
-    index = load_order
-    total = num_tables_to_load
+    csv_delimiter = project.get("csv_delimiter", "|")
 
     # Connections info
     source_conninfo = project_load.get("source_conninfo")
@@ -164,8 +162,6 @@ def run_load(project_load):
     source = config.connection_from_config(source_conninfo)
     target = config.connection_from_config(target_conninfo)
 
-    csv_delimiter = project.get("csv_delimiter", "|")
-
     if project_load.get("schema"):
         # Project and load info
 
@@ -177,12 +173,8 @@ def run_load(project_load):
         target_schema = schema.get("target_schema")
         source_table = table.get("table_name")
         full_source_table = source_schema + "." + source_table
-        target_table = (
-            schema.get("table_prefix", "")
-            + table.get("table_name")
-            + schema.get("table_suffix", "")
-        )
-        full_target_table = target_schema + "." + target_table
+        target_table = f'{schema.get("table_prefix", "")}{table.get("table_name")}{schema.get("table_suffix", "")}'
+        full_target_table = f"{target_schema}.{target_table}"
 
         # If source doesn't exist
         if not source.check_table_exist(full_source_table):
