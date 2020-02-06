@@ -456,7 +456,7 @@ class Database:
             file_path,
             delimiter,
         )
-        return rowcounts
+        return rowcounts, file_path
 
     def insert_from_table_and_drop(self, schema, to_table, from_table):
         if self._read_only:
@@ -550,6 +550,7 @@ class Database:
             return return_code
 
     def import_file(self, schema, table, path, delimiter=","):
+        logger.debug(table)
         if self._read_only:
             sys.exit("This source is readonly. Terminating load run")
         return_code, row_count = run_import_file(

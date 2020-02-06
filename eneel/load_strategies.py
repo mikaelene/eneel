@@ -23,6 +23,108 @@ def strategy_full_table_load(
 ):
     # Set initial returns
     return_code = "ERROR"
+    total_export_row_count = 0
+    total_import_row_count = 0
+
+    # Full source table
+    full_source_table = f"{source_schema}.{source_table}"
+
+    try:
+        # Temp table
+        target_table_tmp = f"{target_table}_tmp"
+
+        # Create temp table
+        try:
+            return_code = load_functions.create_temp_table(
+                return_code,
+                index,
+                total,
+                target,
+                target_schema,
+                target_table_tmp,
+                columns,
+                full_source_table,
+            )
+        except Exception as e:
+            logger.error(e)
+            return_code = "ERROR"
+
+        if return_code == "ERROR":
+            return return_code, total_export_row_count, total_import_row_count
+
+        # Export Import table
+        try:
+            return_code, total_export_row_count, total_import_row_count = load_functions.export_import_table(
+                return_code,
+                index,
+                total,
+                source,
+                source_schema,
+                source_table,
+                columns,
+                temp_path_load,
+                csv_delimiter,
+                target,
+                target_schema,
+                target_table_tmp,
+                replication_key=None,
+                max_replication_key=None,
+                parallelization_key=parallelization_key,
+            )
+        except Exception as e:
+            logger.error(e)
+            return_code = "ERROR"
+
+        if return_code == "ERROR":
+            return return_code, total_export_row_count, total_import_row_count
+
+        # Switch tables
+        try:
+            return_code = load_functions.switch_table(
+                return_code,
+                index,
+                total,
+                target,
+                target_schema,
+                target_table,
+                target_table_tmp,
+                full_source_table,
+            )
+        except Exception as e:
+            logger.error(e)
+            return_code = "ERROR"
+
+        if return_code == "ERROR":
+            return return_code, total_export_row_count, total_import_row_count
+
+        # Return success
+        if return_code == "RUN":
+            return_code = "DONE"
+
+    except:
+        printer.print_load_line(
+            index, total, return_code, full_source_table, msg="load failed"
+        )
+    finally:
+        return return_code, total_export_row_count, total_import_row_count
+
+def strategy_full_table_load2(
+    return_code,
+    index,
+    total,
+    source,
+    source_schema,
+    source_table,
+    columns,
+    temp_path_load,
+    csv_delimiter,
+    target,
+    target_schema,
+    target_table,
+    parallelization_key,
+):
+    # Set initial returns
+    return_code = "ERROR"
     export_row_count = 0
     import_row_count = 0
 
@@ -124,7 +226,6 @@ def strategy_full_table_load(
         )
     finally:
         return return_code, export_row_count, import_row_count
-
 
 def strategy_full_query_load(
     return_code,
