@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor as ThreadExecutor
+from concurrent.futures import ThreadPoolExecutor as ThreadExecutor, as_completed
 import os
 import eneel.printer as printer
 from glob import glob
@@ -74,12 +74,18 @@ def export_table(
             if len(querys) < table_workers:
                 table_workers = len(querys)
 
+            total_loaded = 0
             try:
                 with ThreadExecutor(max_workers=table_workers) as executor:
-                    for row_count in executor.map(
-                        source.export_query, querys, file_paths, csv_delimiters
-                    ):
-                        total_row_count += row_count
+                    future_to_row_count = [executor.submit(source.export_query, query, file_path, csv_delimiter)
+                                           for query, file_path, csv_delimiter in zip(querys, file_paths, csv_delimiters)]
+
+                    for future in as_completed(future_to_row_count):
+                        total_row_count += future.result()
+                        total_loaded += 1
+                        logger.debug(f"{source_schema}.{source_table}: "
+                              f"{str(total_loaded)} of {str(len(querys))} exports completed. "
+                              f"{str(total_row_count)} rows exported")
             except Exception as e:
                 logger.error(e)
 
@@ -97,7 +103,7 @@ def export_table(
                 replication_key,
                 max_replication_key,
             )
-            logger.debug(f"Export query: {query}")
+            #logger.debug(f"Export query: {query}")
 
             total_row_count = source.export_query(query, file_path, csv_delimiter)
 
@@ -207,22 +213,23 @@ def import_into_temp_table(
 
         total_row_count = 0
 
+        total_loaded = 0
         try:
             with ThreadExecutor(max_workers=table_workers) as executor:
-                for row_count in executor.map(
-                    target.import_file,
-                    target_schemas,
-                    target_table_tmps,
-                    temp_path_loads,
-                    delimiters,
-                ):
-                    total_row_count += row_count
+                future_to_row_count = [executor.submit(target.import_file, target_schema, target_table_tmp, temp_path_load, delimiter)
+                                       for target_schema, target_table_tmp, temp_path_load, delimiter in zip(target_schemas, target_table_tmps, temp_path_loads, delimiters)]
+
+                for future in as_completed(future_to_row_count):
+                    total_row_count += future.result()
+                    total_loaded += 1
+                    logger.debug(f"{target_schema}.{target_table_tmp}: "
+                                 f"{str(total_loaded)} of {str(len(temp_path_loads))} imports completed. "
+                                 f"{str(total_row_count)} rows imported")
                 return_code = "RUN"
         except Exception as e:
             logger.error(e)
             return_code = "ERROR"
 
-        # return_code, import_row_count = target.import_table(target_schema, target_table_tmp, temp_path_load, delimiter)
     except:
         return_code = "ERROR"
         printer.print_load_line(
