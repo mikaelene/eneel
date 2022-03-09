@@ -21,20 +21,14 @@ setup(
     url="https://github.com/mikaelene/eneel",
     packages=find_packages(),
     install_requires=[
-        #'pyodbc>=4.0, <4.1',
-        'psycopg2>=2.7, <3',
+        'pyodbc>=4.0, <4.1',
+        'psycopg2-binary>=2.7, <3',
         'cx-Oracle>=7.0.0, <8',
         'PyYAML>=3, <7',
         'colorama>=0.3.9, <5',
-        #'snowflake-connector-python>=1.8.4, <2.8',
+        'snowflake-connector-python>=1.8.4, <2.8',
         'filesplit==2.0.0',
     ],
-    extras_require = {
-        'sql_server':  [
-            'pyodbc>=4.0, <4.1'
-        ],
-        'snowflake': ['snowflake-connector-python>=1.8.4, <2.8']
-    },
     entry_points={
             'console_scripts': ['eneel=eneel.main:main'],
         },
