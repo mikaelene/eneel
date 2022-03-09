@@ -20,5 +20,5 @@ COPY example_project.yml /
 COPY setup.py /
 
 # install dependencies
-RUN pip install git+https://github.com/mikaelene/eneel.git
-# RUN python setup.py install
+# RUN pip install git+https://github.com/mikaelene/eneel.git
+RUN python setup.py install
