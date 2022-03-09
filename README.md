@@ -1,8 +1,7 @@
 # eneel
-eneel is a cli utility for fast extracting and loading data to and from relational databases. The E and L in ELT!
+eneel is a cli utility for fast extracting and loading data to and from relational databases. The E and L in ELT.
 
-The goal is to be the fastest tool in the market. Both in terms of development speed and data movements speed.
-
+Mostly uses the source databases proprietary tools for extracting and loading data.
 
 Features:
 - Fastest way to extract and load large amounts of data between different databases
@@ -29,6 +28,10 @@ Make sure you have the cli-tools for your required databases then:
 
     python setup.py install
 
+### Dependencies
+- With Oracle you need Oracles CLI client SQLplus
+- With SQL server you need CLI tool BCP 
+
 ## Configuration
 After installation an example [connections.yml](example_connections.yml) file will be in your home directory (~/.eneel). That's where you configure your connection info to your sources and targets.
 
@@ -49,13 +52,13 @@ Optional parameters:
 
 ## Feature matrix
 Database | Source | Target
---- | :---: | :---: |
-Postgres | YES | YES
-Sql Server | YES | YES
-Oracle | YES | NO
+--- |:------:| :---: |
+Postgres |  YES   | YES
+Sql Server |  YES   | YES
+Oracle |  YES   | NO
+Snowflake |   NO   | YES
 
 ## Roadmap
-- Support for [Snowflake](https://www.snowflake.com)
 - Support for [BigQuery](https://cloud.google.com/bigquery/)
 - Incremental loads with updates
 - Incremental loads with deletes
