@@ -1,6 +1,8 @@
 from typing import Type
 from pyarrow import Schema
 from sqlalchemy import create_engine, text
+import multiprocessing
+import warnings
 
 from src.schema import pa_schema_to_extended_arrow_schema, ExtendedArrowSchema
 
@@ -9,6 +11,10 @@ import logging
 logging.basicConfig(format="%(levelname)s - %(asctime)s - %(filename)s - %(message)s", )
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.DEBUG)
+
+warnings.filterwarnings("ignore", ".*Dialect snowflake:snowflake will not make use of SQL compilation caching*")
+
+process_name = multiprocessing.current_process().name
 
 
 def sf_create_table(sql_db: str, sql_schema: str, sql_table: str, arrow_schema: Type[ExtendedArrowSchema]) -> str:
@@ -88,7 +94,8 @@ def sf_load_from_storage_integration(
         provider: str = 'Azure',
 ):
 
-    logger.info(f'Start loading {sql_db}.{sql_schema}.{sql_table} from {storage_integration} {container}/{file_path}')
+    logger.info(
+        f'{process_name} - Start loading {sql_db}.{sql_schema}.{sql_table} from {storage_integration} {container}/{file_path}')
 
     if not stage_name:
         stage_name = f'{sql_db}.{sql_schema}.{sql_table}_stage'
@@ -137,4 +144,6 @@ def sf_load_from_storage_integration(
 
     sf_conn.close()
 
-    logger.info(f'Finished loading {sql_db}.{sql_schema}.{sql_table}')
+    logger.info(
+        f'{process_name} - Finished loading {sql_db}.{sql_schema}.{sql_table}')
+

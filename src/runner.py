@@ -1,24 +1,37 @@
 import concurrent.futures
-from typing import Type, Any, List
-from pydantic import BaseModel
+from typing import Type, Any, List, Optional
+from pydantic import BaseModel, validator
+import multiprocessing
 
 from sqlalchemy import create_engine
 from pyarrow import Schema
 
-from src.extractor import extract_sql_to_parquet
+from src.extractor import extract_sql_to_parquet, ExtractResult
 from src.snowflake_utils import sf_load_from_storage_integration
+
+import logging
+
+logging.basicConfig(format="%(levelname)s - %(asctime)s - %(message)s", )
+logger = logging.getLogger(__name__)
+logger.setLevel(level=logging.DEBUG)
+
+process_name = multiprocessing.current_process().name
 
 
 class ExtractTask(BaseModel):
+    task_name: Optional[str] = None
     sqlalchemy_url: str
     query: str
     file_path: str
     filesystem: Any = None
     rows_per_partition: int = 1000000
     pa_schema: Type[Schema] = None
+    status: str = 'not started'
+    extract_result: ExtractResult = None
 
 
 class LoadSnowflakeTask(BaseModel):
+    task_name: Optional[str] = None
     sqlalchemy_url: str
     sql_db: str
     sql_schema: str
@@ -30,17 +43,20 @@ class LoadSnowflakeTask(BaseModel):
     file_path: str = None
     stage_name: str = None
     provider: str = 'Azure'
+    status: str = 'not started'
 
 
 class ExtractLoadSnowflakeTask(BaseModel):
+    task_name: Optional[str] = None
     extract_task: ExtractTask
     load_task: LoadSnowflakeTask
+    status: str = 'not started'
 
 
 def run_extract_task(task: ExtractTask):
-    #print(f'{multiprocessing.current_process().name[5:]} starting to extract {task.query}')
+    logger.info(f'{process_name} - Extraction of "{task.task_name}" starting')
     engine = create_engine(task.sqlalchemy_url)
-    res = extract_sql_to_parquet(
+    result = extract_sql_to_parquet(
         sqlalchemy_engine=engine,
         query=task.query,
         file_path=task.file_path,
@@ -49,11 +65,15 @@ def run_extract_task(task: ExtractTask):
         pa_schema=task.pa_schema
     )
 
-    return res
+    if result:
+        task.extract_result = result
+        task.status = 'completed'
+        logger.info(f'{process_name} - Extraction of "{task.task_name}" to {task.extract_result.output_file_system_type} in path {task.extract_result.output_file_path} {task.status} in {task.extract_result.job_duration}')
+
+    return task
 
 
 def run_load_snowflake_task(task: LoadSnowflakeTask):
-    #print(f'{multiprocessing.current_process().name[5:]} starting to extract {task.query}')
     engine = create_engine(task.sqlalchemy_url)
     sf_load_from_storage_integration(
         sqlalchemy_engine=engine,
@@ -69,19 +89,32 @@ def run_load_snowflake_task(task: LoadSnowflakeTask):
         provider=task.provider
     )
 
+    task.status = 'completed'
+
+    return task
+
 
 def run_extract_load_snowflake_task(task: ExtractLoadSnowflakeTask):
-    extract_result = run_extract_task(task.extract_task)
+    # Extract data to filesystem or blob
+    task.extract_task = run_extract_task(task.extract_task)
 
-    task.load_task.arrow_schema = extract_result.arrow_schema
+    # Set the load arrow schema as the extract arrow schema
+    task.load_task.arrow_schema = task.extract_task.extract_result.arrow_schema
 
-    run_load_snowflake_task(task.load_task)
+    # Load data to snowflake
+    task.load_task = run_load_snowflake_task(task.load_task)
+
+    if task.extract_task.status == 'completed' and task.load_task.status == 'completed':
+        task.status = 'completed'
+
+    return task
 
 
 def runner_extract_load_snowflake_task(tasks: List[ExtractLoadSnowflakeTask], max_workers: int = None):
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        for result in executor.map(run_extract_load_snowflake_task, tasks):
-            print('1 Flow finished')
+        for extract_load_snowflake_task in executor.map(run_extract_load_snowflake_task, tasks):
+            logger.info(
+                f'{process_name} - {extract_load_snowflake_task.task_name} {extract_load_snowflake_task.status}')
 
 
 def runner_extract_task(tasks: List[ExtractTask], max_workers: int = None):

@@ -86,7 +86,7 @@ def extract_sql_to_parquet(
         job_start= job_start
     )
 
-    logger.info(f'{process_name} - Extraction of "{result.query}" to {result.output_file_system_type} in path {result.output_file_path} starting')
+    #logger.info(f'{process_name} - Extraction of "{result.query}" to {result.output_file_system_type} in path {result.output_file_path} starting')
 
     if not filesystem:
         filesystem = pa.fs.LocalFileSystem()
@@ -157,7 +157,7 @@ def extract_sql_to_parquet(
     result.arrow_schema = pa_schema
     result.partitions = partitions
 
-    logger.info(f'{process_name} - Extraction of "{result.query}" finished in {result.job_duration}')
+    #logger.info(f'{process_name} - Extraction of "{result.query}" finished in {result.job_duration}')
 
     conn.close()
 
