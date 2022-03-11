@@ -1,52 +1,20 @@
 import logging
 import datetime
 import time
-from pydantic import BaseModel
-from typing import Type, List, Optional
+from typing import Type
 
-import multiprocessing
 import pyarrow as pa
 from pyarrow import Schema
 from pyarrow.filesystem import FileSystem
 import pyarrow.parquet as pq
 from sqlalchemy import create_engine, text
 
+from src.models import Partition, ExtractResult
 from src.schema import enlarge_pa_schema
 
-#%(process)s
-logging.basicConfig(format="%(levelname)s - %(asctime)s - %(message)s",)
+logging.basicConfig(format="%(levelname)s - %(asctime)s - %(processName)s - %(message)s",)
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.DEBUG)
-
-
-class Partition(BaseModel):
-    id: int
-    file_path: Optional[str]
-    records: Optional[int]
-    size_in_mb: Optional[float]
-    partition_start: Optional[datetime.datetime]
-    partition_end: Optional[datetime.datetime]
-    partition_duration: Optional[datetime.timedelta]
-    extract_duration: Optional[datetime.timedelta]
-    transform_duration: Optional[datetime.timedelta]
-    save_duration: Optional[datetime.timedelta]
-
-
-class ExtractResult(BaseModel):
-    db_engine_type: str
-    query: str
-    output_file_system_type: str
-    output_file_path: str
-    rows_per_partition: int
-    job_start: datetime.datetime
-    job_end: Optional[datetime.datetime]
-    job_duration: Optional[datetime.timedelta]
-    total_extract_duration: Optional[datetime.timedelta]
-    total_transform_duration: Optional[datetime.timedelta]
-    total_save_duration: Optional[datetime.timedelta]
-    arrow_schema: Optional[Type[Schema]]
-    number_of_partitions: Optional[int]
-    partitions: Optional[List[Partition]]
 
 
 def extract_sql_to_parquet(
@@ -69,12 +37,6 @@ def extract_sql_to_parquet(
     :return: ExtactResult
     """
 
-    process_name = multiprocessing.current_process().name
-    # if process_name == 'MainProcess':
-    #     process_name = ''
-    # else:
-    #     process_name = f'Process_{process_name.split("-")[1]}:'
-
     job_start = datetime.datetime.now()
 
     result = ExtractResult(
@@ -86,7 +48,7 @@ def extract_sql_to_parquet(
         job_start= job_start
     )
 
-    #logger.info(f'{process_name} - Extraction of "{result.query}" to {result.output_file_system_type} in path {result.output_file_path} starting')
+    #logger.info(f'Extraction of "{result.query}" to {result.output_file_system_type} in path {result.output_file_path} starting')
 
     if not filesystem:
         filesystem = pa.fs.LocalFileSystem()
@@ -157,7 +119,7 @@ def extract_sql_to_parquet(
     result.arrow_schema = pa_schema
     result.partitions = partitions
 
-    #logger.info(f'{process_name} - Extraction of "{result.query}" finished in {result.job_duration}')
+    #logger.info(f'Extraction of "{result.query}" finished in {result.job_duration}')
 
     conn.close()
 

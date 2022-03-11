@@ -1,3 +1,4 @@
 pyarrow~=6.0.0
 sqlalchemy~=1.4.31
 pydantic~=1.9.0
+PyYAML~=6.0

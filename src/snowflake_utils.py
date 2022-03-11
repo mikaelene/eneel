@@ -1,24 +1,21 @@
 from typing import Type
 from pyarrow import Schema
 from sqlalchemy import create_engine, text
-import multiprocessing
 import warnings
 
 from src.schema import pa_schema_to_extended_arrow_schema, ExtendedArrowSchema
 
 import logging
 
-logging.basicConfig(format="%(levelname)s - %(asctime)s - %(filename)s - %(message)s", )
+logging.basicConfig(format="%(levelname)s - %(asctime)s - %(processName)s - %(message)s",)
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.DEBUG)
 
 warnings.filterwarnings("ignore", ".*Dialect snowflake:snowflake will not make use of SQL compilation caching*")
 
-process_name = multiprocessing.current_process().name
 
-
-def sf_create_table(sql_db: str, sql_schema: str, sql_table: str, arrow_schema: Type[ExtendedArrowSchema]) -> str:
-    sql = f'''create or replace table {sql_db}.{sql_schema}.{sql_table} (
+def sf_create_table(sql_schema: str, sql_table: str, arrow_schema: Type[ExtendedArrowSchema]) -> str:
+    sql = f'''create or replace table {sql_schema}.{sql_table} (
         '''
 
     for i, col in enumerate(arrow_schema.columns):
@@ -69,8 +66,8 @@ from
     return sql
 
 
-def sf_create_copy(sql_db: str, sql_schema: str, sql_table: str, sql_select: str):
-    sql = f'''copy into {sql_db}.{sql_schema}.{sql_table}
+def sf_create_copy(sql_schema: str, sql_table: str, sql_select: str):
+    sql = f'''copy into {sql_schema}.{sql_table}
     from (
 {sql_select}
     )
@@ -82,7 +79,6 @@ def sf_create_copy(sql_db: str, sql_schema: str, sql_table: str, sql_select: str
 
 def sf_load_from_storage_integration(
         sqlalchemy_engine: create_engine,
-        sql_db: str,
         sql_schema: str,
         sql_table: str,
         arrow_schema: Type[Schema],
@@ -95,15 +91,14 @@ def sf_load_from_storage_integration(
 ):
 
     logger.info(
-        f'{process_name} - Start loading {sql_db}.{sql_schema}.{sql_table} from {storage_integration} {container}/{file_path}')
+        f'Start loading {sql_schema}.{sql_table} from {storage_integration} {container}/{file_path}')
 
     if not stage_name:
-        stage_name = f'{sql_db}.{sql_schema}.{sql_table}_stage'
+        stage_name = f'{sql_schema}.{sql_table}_stage'
 
     extended_arrow_schema = pa_schema_to_extended_arrow_schema(arrow_schema)
 
     sql_create_table = sf_create_table(
-        sql_db=sql_db,
         sql_schema=sql_schema,
         sql_table=sql_table,
         arrow_schema=extended_arrow_schema
@@ -123,7 +118,6 @@ def sf_load_from_storage_integration(
     )
 
     sql_copy = sf_create_copy(
-        sql_db=sql_db,
         sql_schema=sql_schema,
         sql_table=sql_table,
         sql_select=sql_select
@@ -145,5 +139,5 @@ def sf_load_from_storage_integration(
     sf_conn.close()
 
     logger.info(
-        f'{process_name} - Finished loading {sql_db}.{sql_schema}.{sql_table}')
+        f'Finished loading {sql_schema}.{sql_table}')
 
