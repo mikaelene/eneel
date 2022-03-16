@@ -48,7 +48,8 @@ def run_import_file(account,
                 + table_format
                 + " type = 'CSV' field_delimiter = '"
                 + delimiter
-                + "' skip_header = 1; "
+                #+ "' skip_header = 1; "
+                + "'; "
             )
             logger.debug(create_format_sql)
             db.execute(create_format_sql)
@@ -449,7 +450,7 @@ class Database:
 
     def generate_create_table_ddl(self, schema, table, columns):
         try:
-            create_table_sql = "CREATE TABLE " + schema + "." + table + "(\n"
+            create_table_sql = "CREATE TRANSIENT TABLE " + schema + "." + table + "(\n"
             for col in columns:
 
                 ordinal_position = col[0]
