@@ -57,20 +57,29 @@ def extract_sql_to_parquet(
         # create folder if not exist
         filesystem.create_dir(file_path, recursive=True)
 
+    # Init connection and cursor, set arraysize for faster loading
     conn = sqlalchemy_engine.raw_connection()
     cursor = conn.cursor()
-
     cursor.arraysize = 10000
     #cursor.prefetchrows = 10000
 
-    execute_query = cursor.execute(query)
+    # Get rows to load
+    row_count_query = f''' select count(*) from (
+    { query }
+    )'''
+    cursor.execute(row_count_query)
+    rows_to_extract = cursor.fetchone()[0]
 
+    # Execute the query to extract and get columns
+    cursor.execute(query)
     column_names = [col[0] for col in cursor.description]
 
+    # Start counter for metrics
+    partition_start_time = time.perf_counter()
+
+    # Do the extraction in partitions
     partitions = []
-
-    start_time = time.perf_counter()
-
+    extracted_rows = 0
     i = 0
     while True:
         partition = cursor.fetchmany(rows_per_partition)
@@ -81,9 +90,9 @@ def extract_sql_to_parquet(
         partition_info = Partition(id=partition_id)
         partition_file_path = f'{file_path}/data_{str(partition_id)}.parquet'
         partition_info.file_path = partition_file_path
-        partition_info.extract_duration = time.perf_counter() - start_time
-        #logger.info(f"Partition {str(partition_id)} extracted in {time.perf_counter() - start_time} sec")
-        start_time = time.perf_counter()
+        partition_info.extract_duration = time.perf_counter() - partition_start_time
+        #logger.info(f"Partition {str(partition_id)} extracted in {time.perf_counter() - partition_start_time} sec")
+        partition_start_time = time.perf_counter()
 
         if not pa_schema:
             pa_table = pa.table(list(zip(*partition)), names=column_names)
@@ -91,20 +100,24 @@ def extract_sql_to_parquet(
 
         pa_table = pa.table(list(zip(*partition)), schema=pa_schema)
 
-        partition_info.transform_duration = time.perf_counter() - start_time
+        partition_info.transform_duration = time.perf_counter() - partition_start_time
         partition_info.records = pa_table.num_rows
         partition_info.size_in_mb = pa_table.nbytes / 1000000
-        #logger.info(f"Partition {str(partition_id)} transformed to Arrow table in {time.perf_counter() - start_time} sec")
-        start_time = time.perf_counter()
+        #logger.info(f"Partition {str(partition_id)} transformed to Arrow table in {time.perf_counter() - partition_start_time} sec")
+        partition_start_time = time.perf_counter()
 
         pq.write_table(pa_table, partition_file_path, filesystem=filesystem)
 
-        partition_info.save_duration = time.perf_counter() - start_time
+        partition_info.save_duration = time.perf_counter() - partition_start_time
 
         partitions.append(partition_info)
 
-        #logger.info(f"Partition {str(partition_id)} saved as parquet file in {time.perf_counter() - start_time} sec")
-        start_time = time.perf_counter()
+        #logger.info(f"Partition {str(partition_id)} saved as parquet file in {time.perf_counter() - partition_start_time} sec")
+        extracted_rows += partition_info.records
+        elapsed_time = datetime.datetime.now() - job_start
+        logger.info(
+            f"{str(extracted_rows)} of {str(rows_to_extract)} extracted in {str(elapsed_time)[:-4]} at {round(extracted_rows / sum([i.extract_duration for i in partitions]))} rows/sec")
+        partition_start_time = time.perf_counter()
 
     job_end = datetime.datetime.now()
     job_duration = job_end - job_start

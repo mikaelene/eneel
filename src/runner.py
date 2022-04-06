@@ -1,4 +1,4 @@
-import concurrent.futures
+import datetime
 from multiprocessing import Pool
 from typing import List
 
@@ -74,9 +74,15 @@ def run_extract_load_snowflake_task(task: ExtractLoadSnowflakeTask):
 
 
 def runner_extract_load_snowflake_task(tasks: List[ExtractLoadSnowflakeTask], max_workers: int = None):
+    job_start = datetime.datetime.now()
+    logger.info('Starting extraction and loading to snowflake...')
+
     with Pool(max_workers) as executor:
         executor.map(run_extract_load_snowflake_task, tasks)
 
+    job_end = datetime.datetime.now()
+    job_duration = job_end - job_start
+    logger.info(f'Finished extraction and loading to snowflake in {job_duration}')
 
 def runner_extract_task(tasks: List[ExtractTask], max_workers: int = None):
     with Pool(max_workers) as executor:

@@ -22,7 +22,7 @@ def job_to_extract_load_tasks(job: dict) -> ExtractLoadSnowflakeTask:
                 query=query,
                 file_path=file_path,
                 filesystem=abfs,
-                rows_per_partition=10000
+                #rows_per_partition=10000
             )
 
             load_snowflake_task = LoadSnowflakeTask(
