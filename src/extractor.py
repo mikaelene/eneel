@@ -7,7 +7,7 @@ import pyarrow as pa
 from pyarrow import Schema
 from pyarrow.filesystem import FileSystem
 import pyarrow.parquet as pq
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 
 from src.models import Partition, ExtractResult
 from src.schema import enlarge_pa_schema

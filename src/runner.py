@@ -1,4 +1,5 @@
 import concurrent.futures
+from multiprocessing import Pool
 from typing import List
 
 from sqlalchemy import create_engine
@@ -67,17 +68,16 @@ def run_extract_load_snowflake_task(task: ExtractLoadSnowflakeTask):
     if task.extract_task.status == 'completed' and task.load_task.status == 'completed':
         task.status = 'completed'
 
+    logger.info(f'{task.task_name} {task.status}')
+
     return task
 
 
 def runner_extract_load_snowflake_task(tasks: List[ExtractLoadSnowflakeTask], max_workers: int = None):
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        for extract_load_snowflake_task in executor.map(run_extract_load_snowflake_task, tasks):
-            logger.info(
-                f'{extract_load_snowflake_task.task_name} {extract_load_snowflake_task.status}')
+    with Pool(max_workers) as executor:
+        executor.map(run_extract_load_snowflake_task, tasks)
 
 
 def runner_extract_task(tasks: List[ExtractTask], max_workers: int = None):
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        for result in executor.map(run_extract_task, tasks):
-            print(result.job_start)
+    with Pool(max_workers) as executor:
+        executor.map(run_extract_task, tasks)
