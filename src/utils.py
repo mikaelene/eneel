@@ -1,5 +1,9 @@
 import yaml
 
+from pyarrow.filesystem import FileSystem
+from pyarrow import fs
+from adlfs import AzureBlobFileSystem
+
 import logging
 
 logging.basicConfig(format="%(levelname)s - %(asctime)s - %(processName)s - %(message)s",)
@@ -15,3 +19,9 @@ def read_yml(path: str) -> dict:
             logger.error(exc)
 
 
+def file_system_from_uri(uri: str) -> FileSystem:
+    if 'windows.net' in uri:
+        return AzureBlobFileSystem(connection_string=uri)
+
+    else:
+        return fs.FileSystem.from_uri(uri)
