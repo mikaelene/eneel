@@ -66,7 +66,7 @@ def extract_sql_to_parquet(
     # Get rows to load
     row_count_query = f''' select count(*) from (
     { query }
-    )'''
+    ) q'''
     cursor.execute(row_count_query)
     rows_to_extract = cursor.fetchone()[0]
 
