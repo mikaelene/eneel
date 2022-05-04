@@ -97,7 +97,9 @@ def extract_sql_to_parquet(
         if not pa_schema:
             pa_table = pa.table(list(zip(*partition)), names=column_names)
             pa_schema = enlarge_pa_schema(pa_schema=pa_table.schema)
+            logger.info(pa_schema)
 
+        #logger.info(pa_schema)
         pa_table = pa.table(list(zip(*partition)), schema=pa_schema)
 
         partition_info.transform_duration = time.perf_counter() - partition_start_time

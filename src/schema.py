@@ -1,3 +1,5 @@
+import re
+
 from pydantic import BaseModel
 from typing import Type, List, Optional
 from pyarrow import Schema
@@ -95,3 +97,36 @@ def enlarge_pa_schema(pa_schema: Type[Schema]) -> Type[Schema]:
 
     return pa.schema(new_pa_schema)
 
+
+def schema_type_to_pa_field(field_name: str, field_type: str) -> pa.Field:
+    if field_type[:3] == 'int'or field_type[:4] == 'uint':
+        return pa.field(field_name, pa.int64())
+    elif field_type[:5] == 'float':
+        return pa.field(field_name, pa.float64())
+    elif field_type[:7] == 'decimal':
+        precision = int(re.search('\((.*)\,', field_type).group(1))
+        scale = int(re.search('\,(.*)\)', field_type).group(1))
+        return pa.field(field_name, pa.decimal256(precision, scale))
+    elif field_type[:9] == 'timestamp':
+        unit = re.search('\[(.*)\]', field_type).group(1)
+        return pa.field(field_name, pa.timestamp(unit))
+    elif field_type[:4] == 'time':
+        unit = re.search('\[(.*)\]', field_type).group(1)
+        return pa.field(field_name, pa.time(unit))
+    elif field_type[:4] == 'date':
+        return pa.field(field_name, pa.date64())
+    elif field_type[:8] == 'duration':
+        unit = re.search('\[(.*)\]', field_type).group(1)
+        return pa.field(field_name, pa.duration(unit))
+    elif field_type[:6] == 'binary':
+        return pa.field(field_name, pa.binary())
+    elif field_type[:6] == 'string':
+        return pa.field(field_name, pa.string())
+
+
+def schema_to_pa_schema(schema: dict) -> pa.Schema:
+    fields = []
+    for key, value in schema.items():
+        fields.append(schema_type_to_pa_field(key, value))
+
+    return pa.schema(fields)
