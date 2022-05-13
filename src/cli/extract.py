@@ -37,6 +37,8 @@ def extract(
     if schema:
         schema = json.loads(schema)
         pa_schema = schema_to_pa_schema(schema)
+    else:
+        pa_schema = None
 
     if not rows_per_partition:
         rows_per_partition = 1000000
