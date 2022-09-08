@@ -6,7 +6,6 @@ from typing import Type
 import csv
 
 import fsspec
-from fsspec import AbstractFileSystem
 
 from sqlalchemy import create_engine
 
@@ -21,8 +20,8 @@ def extract_sql_to_csv(
         sqlalchemy_engine: create_engine,
         query: str,
         file_path: str,
+        file_suffix: str = 'csv',
         storage_options = None,
-        #filesystem: Type[AbstractFileSystem] = None,
         rows_per_partition: int = 1000000,
         #pa_schema: Type[Schema] = None
 ) -> Type[ExtractResult]:
@@ -38,10 +37,16 @@ def extract_sql_to_csv(
     :return: ExtactResult
     """
 
-    # Clear path, Optionally?
-    fs = fsspec.open(urlpath=file_path, mode="w", **storage_options)
-    fs.fs.rm(file_path, recursive=True)
-    fs.close()
+    # Clear path, Optionally? Verkar inte funka i azure blob?
+    try:
+        fs = fsspec.open(urlpath=file_path, mode="w", **storage_options)
+        fs.fs.rm(file_path, recursive=True)
+        fs.close()
+    except RuntimeError as e:
+        if 'ErrorCode:DirectoryIsNotEmpty' in e.args[0]:
+            pass
+        else:
+            logger.error(e)
 
     schema = None
 
@@ -106,7 +111,8 @@ def extract_sql_to_csv(
 
         partition_id = i
         partition_info = Partition(id=partition_id)
-        partition_file_path = f'{file_path}/data_{str(partition_id)}.gzip'
+        partition_file_path = f'{file_path}/data_{str(partition_id)}.{file_suffix}'
+        #partition_file_path = f'{file_path}/data_{str(partition_id)}.csv'
         partition_info.file_path = partition_file_path
         partition_info.extract_duration = time.perf_counter() - partition_start_time
         #logger.info(f"Partition {str(partition_id)} extracted in {time.perf_counter() - partition_start_time} sec")
@@ -127,7 +133,13 @@ def extract_sql_to_csv(
 
         #with gzip.open(partition_file_path, "wt") as f:
         #with open(partition_file_path, "w") as f:
-        with fsspec.open(urlpath=partition_file_path, mode="w", compression="gzip", **storage_options) as f:
+        with fsspec.open(
+                urlpath=partition_file_path,
+                mode="w",
+                compression="infer",
+                #compression="gzip",
+                **storage_options,
+        ) as f:
             csv_writer = csv.writer(f)
             for row in partition:
                 csv_writer.writerow(row)
